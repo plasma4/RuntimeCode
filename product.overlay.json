@@ -1,0 +1,51 @@
+{
+	"_comment": [
+		"Deep-merged over the upstream vscode product.json by scripts/prepare.mjs.",
+		"A null value deletes the upstream key.",
+		"Telemetry needs no entry here: the OSS build has no aiConfig.ariaKey and",
+		"telemetryUtils.ts gates every appender on it, so nothing is ever sent.",
+		"Likewise updateUrl / nlsCoreBaseUrl / experimentsUrl / tasConfig are absent",
+		"upstream and must simply not be reintroduced."
+	],
+
+	"nameShort": "RuntimeCode",
+	"nameLong": "RuntimeCode",
+	"applicationName": "runtimecode",
+	"dataFolderName": ".runtimecode",
+	"urlProtocol": "runtimecode",
+
+	"licenseName": "MIT",
+	"licenseUrl": "https://github.com/plasma4/runtimecode/blob/main/LICENSE",
+	"serverLicenseUrl": "https://github.com/plasma4/runtimecode/blob/main/LICENSE",
+	"reportIssueUrl": "https://github.com/plasma4/runtimecode/issues/new",
+
+	"_comment_webview": [
+		"MUST be removed: left in place, environmentService.ts resolves webviews to",
+		"vscode-cdn.net and every webview breaks offline. staticify.mjs supplies a",
+		"same-origin webviewEndpoint instead."
+	],
+	"webviewContentExternalBaseUrlTemplate": null,
+
+	"_comment_copilot": [
+		"defaultChatAgent is deliberately LEFT INTACT. Removing it breaks startup:",
+		"welcomeOnboarding/browser/onboardingVariationA.ts:80 does",
+		"assertDefined(product.defaultChatAgent, ...) at module scope, and ~38 other",
+		"sites read fields off it. The workbench refuses to construct without it.",
+		"",
+		"Copilot is instead disabled the way the user asked for: the extension is",
+		"not bundled, so none of these endpoints are ever contacted, and the URLs",
+		"remain inert config. This also leaves the door open to installing Copilot",
+		"from the gallery later rather than making that choice for the user.",
+		"See endpoint-allowlist.json for the per-endpoint justification."
+	],
+	"voiceWsUrl": null,
+
+	"_comment_gallery": "Open VSX, as VSCodium does. No Microsoft endpoints.",
+	"extensionsGallery": {
+		"serviceUrl": "https://open-vsx.org/vscode/gallery",
+		"itemUrl": "https://open-vsx.org/vscode/item",
+		"resourceUrlTemplate": "https://open-vsx.org/vscode/asset/{publisher}/{name}/{version}/Microsoft.VisualStudio.Code.WebResources/{path}",
+		"controlUrl": "",
+		"nlsBaseUrl": ""
+	}
+}

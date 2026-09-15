@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>RuntimeCode Preview</title>
+	<style>
+		html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; display: block; }
+		#status { display: none; position: fixed; right: 12px; bottom: 12px; max-width: 34rem; padding: 8px 10px;
+			background: #2b1d1d; color: #f5c2c7; border: 1px solid #a33; border-radius: 4px; font: 12px system-ui; }
+	</style>
+</head>
+<body>
+	<div id="status"></div>
+	<iframe id="preview" title="Live Preview"></iframe>
+	<script>
+		const params = new URLSearchParams(location.search);
+		const target = params.get('target');
+		const inspector = params.get('inspector') === '1';
+		const autoReload = params.get('autoreload') !== '0';
+		const frame = document.getElementById('preview');
+		const status = document.getElementById('status');
+
+		const loadPreview = () => {
+			const previewUrl = new URL(target);
+			previewUrl.searchParams.set('__rc', Date.now());
+			frame.src = previewUrl.toString();
+		};
+
+		if (!target) {
+			status.textContent = 'RuntimeCode preview has no target URL.';
+			status.style.display = 'block';
+		} else {
+			loadPreview();
+		}
+
+		const showStatus = (message) => {
+			status.textContent = message;
+			status.style.display = 'block';
+		};
+
+		frame.addEventListener('load', async () => {
+			if (!inspector || !target) { return; }
+			try {
+				const doc = frame.contentDocument;
+				if (!doc || doc.defaultView.location.origin !== location.origin) {
+					throw new Error('the preview is not same-origin');
+				}
+				if (doc.defaultView.eruda) { return; }
+				const script = doc.createElement('script');
+				script.src = new URL('./rc-assets/eruda.js', location.href).toString();
+				script.onload = () => doc.defaultView.eruda.init();
+				script.onerror = () => showStatus('Inspector could not load. Check the project Content-Security-Policy.');
+				doc.head.append(script);
+			} catch (error) {
+				showStatus(`Inspector unavailable: ${error.message}.`);
+			}
+		});
+
+		// RuntimeFS broadcasts INVALIDATE_CACHE after a RuntimeCode save. Only Dev
+		// Preview listens; True Preview opens the target URL directly.
+		if (autoReload && navigator.serviceWorker) {
+			navigator.serviceWorker.addEventListener('message', (event) => {
+				if (event.data?.type === 'INVALIDATE_CACHE') { loadPreview(); }
+			});
+		}
+	</script>
+</body>
+</html>

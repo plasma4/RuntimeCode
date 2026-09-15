@@ -1,0 +1,77 @@
+Make "Open Folder" work in the browser.
+
+Upstream's web FileDialogService never implemented pickFolderAndOpen; it throws
+"Can't open folders, try adding a folder to the workspace instead." in every
+browser, so the empty-workbench Open Folder button is dead. The machinery
+already exists -- showOpenDialog() picks a directory with showDirectoryPicker()
+and registers it with HTMLFileSystemProvider -- so call it, and fall back to the
+unsupported-browser warning where the File System Access API is missing.
+
+contextkeys.ts is the other half: without it the command is hidden in web, so
+the implementation would never be reachable.
+diff --git a/src/vs/workbench/browser/contextkeys.ts b/src/vs/workbench/browser/contextkeys.ts
+index 11fb7cce74a..ef81065e163 100644
+--- a/src/vs/workbench/browser/contextkeys.ts
++++ b/src/vs/workbench/browser/contextkeys.ts
+@@ -139,7 +139,7 @@ export class WorkbenchContextKeysHandler extends Disposable {
+ 		// (e.g. "Open Folder...") is limited in web when not connected
+ 		// to a remote.
+ 		this.openFolderWorkspaceSupportContext = OpenFolderWorkspaceSupportContext.bindTo(this.contextKeyService);
+-		this.openFolderWorkspaceSupportContext.set(isNative || typeof this.environmentService.remoteAuthority === 'string');
++		this.openFolderWorkspaceSupportContext.set(isNative || WebFileSystemAccess.supported(mainWindow) || typeof this.environmentService.remoteAuthority === 'string');
+ 
+ 		// Empty workspace support: empty workspaces require built-in file system
+ 		// providers to be available that allow to enter a workspace or open loose
+diff --git a/src/vs/workbench/services/dialogs/browser/fileDialogService.ts b/src/vs/workbench/services/dialogs/browser/fileDialogService.ts
+index f75fa27784e..67216b30f7d 100644
+--- a/src/vs/workbench/services/dialogs/browser/fileDialogService.ts
++++ b/src/vs/workbench/services/dialogs/browser/fileDialogService.ts
+@@ -39,7 +39,38 @@ export class FileDialogService extends AbstractFileDialogService implements IFil
+ 			return super.pickFileFolderAndOpenSimplified(schema, options, false);
+ 		}
+ 
+-		throw new Error(localize('pickFolderAndOpen', "Can't open folders, try adding a folder to the workspace instead."));
++		return this.pickFolderAndOpenWeb(options);
++	}
++
++	/**
++	 * Upstream throws here, which makes the "Open Folder" button in the empty
++	 * workbench dead in every browser. The machinery to do it already exists —
++	 * showOpenDialog() picks a directory via showDirectoryPicker() and registers
++	 * it with the HTMLFileSystemProvider — so use that, and fall back to the
++	 * RuntimeFS options where the File System Access API is unavailable.
++	 */
++	private async pickFolderAndOpenWeb(options: IPickAndOpenOptions): Promise<void> {
++		const activeWindow = getActiveWindow();
++		if (!WebFileSystemAccess.supported(activeWindow)) {
++			return this.showUnsupportedBrowserWarning('open');
++		}
++
++		let uri: URI | undefined;
++		try {
++			const handle = await activeWindow.showDirectoryPicker({
++				...{ startIn: Iterable.first(this.fileSystemProvider.directories) ?? 'documents' }
++			});
++			uri = await this.fileSystemProvider.registerDirectoryHandle(handle);
++		} catch (error) {
++			return; // `showDirectoryPicker` throws when the user cancels
++		}
++
++		if (uri) {
++			return this.hostService.openWindow([{ folderUri: uri }], {
++				forceNewWindow: options.forceNewWindow,
++				remoteAuthority: options.remoteAuthority
++			});
++		}
+ 	}
+ 
+ 	protected override addFileSchemaIfNeeded(schema: string, isFolder: boolean): string[] {
+@@ -92,7 +123,7 @@ export class FileDialogService extends AbstractFileDialogService implements IFil
+ 			return super.pickFolderAndOpenSimplified(schema, options);
+ 		}
+ 
+-		throw new Error(localize('pickFolderAndOpen', "Can't open folders, try adding a folder to the workspace instead."));
++		return this.pickFolderAndOpenWeb(options);
+ 	}
+ 
+ 	async pickWorkspaceAndOpen(options: IPickAndOpenOptions): Promise<void> {

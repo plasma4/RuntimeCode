@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>spike exthost frame</title></head>
+<body>
+<script>
+	// Stands in for VS Code's web extension host: a same-origin iframe that
+	// spawns a worker, which must be able to reach the same OPFS tree RuntimeFS
+	// writes into.
+	(async () => {
+		const report = (data) => parent.postMessage({ __spike: 'exthost', ...data }, '*');
+		try {
+			const w = new Worker('./worker.js', { type: 'module' });
+			const timer = setTimeout(() => report({ ok: false, error: 'worker timeout' }), 10000);
+			w.onmessage = (e) => { clearTimeout(timer); report(e.data); };
+			w.onerror = (e) => { clearTimeout(timer); report({ ok: false, error: 'worker error: ' + e.message }); };
+		} catch (err) {
+			report({ ok: false, error: String(err) });
+		}
+	})();
+</script>
+</body>
+</html>

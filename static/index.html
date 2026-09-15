@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script>performance.mark('code/didStartRenderer');</script>
+	<meta charset="utf-8" />
+
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-title" content="RuntimeCode">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+
+	<!--
+		RuntimeCode's own bootstrap.
+
+		The upstream out/vs/code/browser/workbench/workbench.html is NOT usable
+		for this target: build/next/index.ts:179-185 builds the `web` target with
+		"web workbench only (no browser shell)", so vs/code/browser/workbench/
+		workbench.js is never emitted — only server-web gets it. The vscode-web
+		bundle is meant to be driven by an embedder calling create() directly,
+		which is what this file does. That is also what we want, since the RFS
+		workspace and filesystem providers plug in here.
+	-->
+	<meta id="vscode-workbench-web-configuration" data-settings="{{WORKBENCH_WEB_CONFIGURATION}}">
+
+	<link rel="icon" href="./favicon.ico" type="image/x-icon" />
+	<link rel="manifest" href="./manifest.json" crossorigin="use-credentials" />
+	<link rel="stylesheet" href="./out/vs/workbench/workbench.web.main.internal.css">
+	<style>
+		html, body { height: 100%; margin: 0; overflow: hidden; }
+		#rc-error {
+			display: none; font: 13px ui-monospace, monospace; padding: 1rem;
+			color: #d33; white-space: pre-wrap;
+		}
+	</style>
+</head>
+
+<body aria-label="">
+	<pre id="rc-error"></pre>
+</body>
+
+<script>
+	globalThis._VSCODE_FILE_ROOT = new URL('./out/', window.location.href).toString();
+</script>
+
+<!-- Built-in English strings. Must load before the workbench module. -->
+<script type="module" src="./out/nls.messages.js"></script>
+
+<script type="module">
+	const showError = (message) => {
+		const el = document.getElementById('rc-error');
+		el.style.display = 'block';
+		el.textContent = 'RuntimeCode failed to start:\n\n' + message;
+	};
+
+	try {
+		const settings = document.getElementById('vscode-workbench-web-configuration').getAttribute('data-settings');
+		if (!settings) { throw new Error('missing workbench configuration'); }
+		const config = JSON.parse(settings);
+
+		const { create, URI } = await import('./out/vs/workbench/workbench.web.main.internal.js');
+
+		/**
+		 * Minimal IWorkspaceProvider (see vs/workbench/browser/web.api.ts). The
+		 * workspace is carried in the URL so a reload reopens the same folder,
+		 * and so RuntimeFS folders can be linked to directly.
+		 */
+		const params = new URLSearchParams(window.location.search);
+		const folder = params.get('folder');
+		const workspace = params.get('workspace');
+
+		const toWorkspace = () => {
+			if (workspace) { return { workspaceUri: URI.parse(workspace) }; }
+			if (folder) { return { folderUri: URI.parse(folder) }; }
+			return undefined;	// empty workbench
+		};
+
+		const workspaceProvider = {
+			workspace: toWorkspace(),
+			trusted: true,
+			payload: [],
+			async open(target, options) {
+				const next = new URL(window.location.href);
+				next.searchParams.delete('folder');
+				next.searchParams.delete('workspace');
+				if (target && 'folderUri' in target) {
+					next.searchParams.set('folder', target.folderUri.toString());
+				} else if (target && 'workspaceUri' in target) {
+					next.searchParams.set('workspace', target.workspaceUri.toString());
+				}
+
+				if (options?.reuse) {
+					window.location.href = next.toString();
+					return true;
+				}
+				return !!window.open(next.toString(), '_blank');
+			}
+		};
+
+		// The RuntimeFS extension ships beside the workbench and is registered as a
+		// built-in. The URI has to be built at runtime because the folder can be
+		// served from any path — including /n/<Folder>/ inside RuntimeFS itself.
+		const runtimefsExtension = URI.parse(
+			new URL('./rc-extensions/runtimefs/', window.location.href).toString()
+		);
+
+		/**
+		 * RuntimeFS's service worker caches per folder, so a preview tab keeps
+		 * serving stale files after an edit until it is told otherwise. The
+		 * extension host is a worker and has no ServiceWorkerContainer, so the
+		 * extension asks the workbench to relay the message from here.
+		 */
+		const invalidateRfsCache = async (folder) => {
+			const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+			if (!sw || typeof folder !== 'string') { return false; }
+			sw.postMessage({ type: 'INVALIDATE_CACHE', folderName: folder });
+			return true;
+		};
+
+		/**
+		 * Where RuntimeFS is mounted. RuntimeCode is normally served *from* a
+		 * RuntimeFS folder, so everything before the `/n/` segment is the
+		 * RuntimeFS root. Returns undefined when hosted standalone, which the
+		 * extension reports rather than opening a broken preview.
+		 */
+		const getRuntimeFsBase = async () => {
+			const url = new URL(window.location.href);
+			const index = url.pathname.indexOf('/n/');
+			return index === -1 ? undefined : url.origin + url.pathname.slice(0, index);
+		};
+
+		const getRuntimeCodeBase = async () => new URL('./', window.location.href).toString();
+
+		// The extension host is a worker and has no window.open.
+		const openExternalTab = async (target) => {
+			if (typeof target !== 'string') { return false; }
+			return !!window.open(target, '_blank', 'noopener');
+		};
+
+		const copyDirectory = async (source, destination) => {
+			for await (const [name, entry] of source.entries()) {
+				if (entry.kind === 'directory') {
+					await copyDirectory(entry, await destination.getDirectoryHandle(name, { create: true }));
+				} else {
+					const writable = await (await destination.getFileHandle(name, { create: true })).createWritable();
+					await writable.write(await entry.getFile());
+					await writable.close();
+				}
+			}
+		};
+
+		const updateRfsRegistry = async (name) => {
+			const write = async () => {
+				const root = await navigator.storage.getDirectory();
+				let registry = {};
+				try {
+					const file = await (await root.getFileHandle('rfs_system.json')).getFile();
+					registry = JSON.parse(await file.text()) || {};
+				} catch { /* first RuntimeFS folder */ }
+				registry[name] = { ...(registry[name] || {}), encryptionType: null, lastModified: Date.now() };
+				const handle = await root.getFileHandle('rfs_system.json', { create: true });
+				const writable = await handle.createWritable();
+				await writable.write(JSON.stringify(registry));
+				await writable.close();
+			};
+			return navigator.locks ? navigator.locks.request('rfs_registry_lock', { mode: 'exclusive' }, write) : write();
+		};
+
+		/** Pick a native directory, copy it to OPFS, and make it a RuntimeFS folder. */
+		const importRfsFolder = async () => {
+			if (!window.showDirectoryPicker) {
+				throw new Error('Import RuntimeFS Folder requires Chromium\'s directory picker.');
+			}
+			const source = await window.showDirectoryPicker({ mode: 'read' });
+			const name = window.prompt('Name for the RuntimeFS folder:', source.name)?.trim();
+			if (!name) { return undefined; }
+			if (/[\\/]/.test(name)) { throw new Error('The folder name cannot contain slashes.'); }
+
+			const copy = async () => {
+				const root = await navigator.storage.getDirectory();
+				const rfs = await root.getDirectoryHandle('rfs', { create: true });
+				let exists = true;
+				try { await rfs.getDirectoryHandle(name); } catch { exists = false; }
+				if (exists && !window.confirm(`Replace the existing RuntimeFS folder "${name}"?`)) { return undefined; }
+				if (exists) { await rfs.removeEntry(name, { recursive: true }); }
+				await copyDirectory(source, await rfs.getDirectoryHandle(name, { create: true }));
+				await updateRfsRegistry(name);
+				await invalidateRfsCache(name);
+				return name;
+			};
+			return navigator.locks ? navigator.locks.request(`rfs_write_${name}`, copy) : copy();
+		};
+
+		const loadLittleExport = async () => {
+			if (window.LittleExport) { return window.LittleExport; }
+			const base = await getRuntimeFsBase();
+			if (!base) { throw new Error('Export requires RuntimeCode to be served from RuntimeFS.'); }
+			await new Promise((resolve, reject) => {
+				const script = document.createElement('script');
+				script.src = new URL('little-export.core.js', `${base}/`).toString();
+				script.onload = resolve;
+				script.onerror = () => reject(new Error('Could not load LittleExport from RuntimeFS.'));
+				document.head.append(script);
+			});
+			if (!window.LittleExport) { throw new Error('LittleExport did not initialize.'); }
+			return window.LittleExport;
+		};
+
+		/** Stream a single OPFS folder through LittleExport and save it as .tar.gz. */
+		const exportRfsFolder = async (name) => {
+			if (typeof name !== 'string' || !name) { throw new Error('Invalid RuntimeFS folder.'); }
+			if (!window.CompressionStream) { throw new Error('Export requires Chromium\'s CompressionStream support.'); }
+			const root = await navigator.storage.getDirectory();
+			const rfs = await root.getDirectoryHandle('rfs');
+			const folder = await rfs.getDirectoryHandle(name);
+			const tar = (await loadLittleExport()).folderToTarStream(folder, undefined, { pathPrefix: name });
+			const archive = tar.pipeThrough(new CompressionStream('gzip'));
+			const suggestedName = `${name}.tar.gz`;
+			if (window.showSaveFilePicker) {
+				const handle = await window.showSaveFilePicker({ suggestedName, types: [{ description: 'Gzip tar archive', accept: { 'application/gzip': ['.tar.gz'] } }] });
+				await archive.pipeTo(await handle.createWritable());
+				return true;
+			}
+			const blob = await new Response(archive).blob();
+			const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: suggestedName });
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(link.href), 0);
+			return true;
+		};
+
+		// Must be absolute: webviewElement.ts:584 parses this and compares
+		// scheme://authority against the origin of messages coming from the
+		// webview iframe. A relative value parses to "://" and every webview
+		// message is dropped. Computed here so the folder stays portable.
+		const webviewEndpoint = new URL(
+			'./out/vs/workbench/contrib/webview/browser/pre', window.location.href
+		).toString();
+
+		await create(document.body, {
+			...config,
+			webviewEndpoint,
+			workspaceProvider,
+			additionalBuiltinExtensions: [runtimefsExtension],
+			// Handlers are functions, so these cannot live in the JSON config.
+			commands: [
+				{ id: 'runtimecode.internal.invalidateRfsCache', handler: invalidateRfsCache },
+				{ id: 'runtimecode.internal.getRuntimeFsBase', handler: getRuntimeFsBase },
+				{ id: 'runtimecode.internal.getRuntimeCodeBase', handler: getRuntimeCodeBase },
+				{ id: 'runtimecode.internal.openExternalTab', handler: openExternalTab },
+				{ id: 'runtimecode.internal.importRfsFolder', handler: importRfsFolder },
+				{ id: 'runtimecode.internal.exportRfsFolder', handler: exportRfsFolder }
+			]
+		});
+	} catch (err) {
+		showError(err && err.stack ? err.stack : String(err));
+		throw err;
+	}
+</script>
+</html>

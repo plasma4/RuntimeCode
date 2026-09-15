@@ -1,0 +1,13 @@
+#!/bin/sh
+# node-gyp probes `xcodebuild -version` to detect a toolchain and only falls back
+# to pkgutil receipts, which are missing on this machine even though the Command
+# Line Tools are installed and clang works. Report a plausible version so gyp
+# proceeds; it then uses clang/xcrun from the CLT, which are present.
+case "$1" in
+  -version)
+    echo "Xcode 16.0"
+    echo "Build version 16A242d"
+    exit 0
+    ;;
+esac
+exec /usr/bin/xcrun "$@"

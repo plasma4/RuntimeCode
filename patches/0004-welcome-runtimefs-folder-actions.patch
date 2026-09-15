@@ -1,0 +1,185 @@
+Give RuntimeFS folders first-class treatment on the Welcome page.
+
+Three related changes to the same surface:
+
+- Start list gains Open/Import RuntimeFS Folder, and upstream's Open Folder is
+  un-hidden in web now that patch 0002 makes it work.
+- Recent entries for rfs: folders drop the parent-path column. A RuntimeFS
+  folder is addressed by name alone, so splitRecentLabel always produced a bare
+  `~` that told the reader nothing.
+- Both carry a `runtimefs` class so they can take their own theme colour, which
+  is what now distinguishes a RuntimeFS folder from a local one in Recent.
+
+The className field has to be threaded through the start-entry type to reach
+the Start list; Recent builds its element directly.
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+index 0cb22b9cf17..5009bacbb0e 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -23,6 +23,7 @@ import { ILink, LinkedText } from '../../../../base/common/linkedText.js';
+ import { parse } from '../../../../base/common/marshalling.js';
+ import { Schemas, matchesScheme } from '../../../../base/common/network.js';
+ import { OS } from '../../../../base/common/platform.js';
++import { basename } from '../../../../base/common/resources.js';
+ import { ThemeIcon } from '../../../../base/common/themables.js';
+ import { assertReturnsDefined } from '../../../../base/common/types.js';
+ import { URI } from '../../../../base/common/uri.js';
+@@ -88,6 +89,7 @@ export interface IWelcomePageStartEntry {
+ 	description: string;
+ 	command: string;
+ 	order: number;
++	className?: string;
+ 	icon: { type: 'icon'; icon: ThemeIcon };
+ 	when: ContextKeyExpression;
+ }
+@@ -98,6 +100,7 @@ const parsedStartEntries: IWelcomePageStartEntry[] = startEntries.map((e, i) =>
+ 	icon: { type: 'icon', icon: e.icon },
+ 	id: e.id,
+ 	order: i,
++	className: e.className,
+ 	title: e.title,
+ 	when: ContextKeyExpr.deserialize(e.when) ?? ContextKeyExpr.true()
+ }));
+@@ -1048,14 +1051,22 @@ export class GettingStartedPage extends EditorPane {
+ 				resourceUri = recent.workspace.configPath;
+ 			}
+ 
+-			const { name, parentPath } = splitRecentLabel(fullPath);
++			// RuntimeCode: a RuntimeFS folder is addressed by name alone, so the
++			// parent path is always a bare `~` placeholder that says nothing. Drop
++			// it and signal the folder's origin with the RuntimeFS hue instead.
++			const isRuntimeFS = resourceUri.scheme === 'rfs';
++			const { name, parentPath } = isRuntimeFS
++				? { name: basename(resourceUri) || fullPath, parentPath: '' }
++				: splitRecentLabel(fullPath);
+ 
+ 			const li = $('li');
+-			const link = $('button.button-link');
++			const link = $(`button.button-link${isRuntimeFS ? '.runtimefs' : ''}`);
+ 
+ 			link.innerText = name;
+ 			link.title = fullPath;
+-			link.setAttribute('aria-label', localize('welcomePage.openFolderWithPath', "Open folder {0} with path {1}", name, parentPath));
++			link.setAttribute('aria-label', parentPath
++				? localize('welcomePage.openFolderWithPath', "Open folder {0} with path {1}", name, parentPath)
++				: localize('welcomePage.openFolder', "Open folder {0}", name));
+ 			link.addEventListener('click', e => {
+ 				this.telemetryService.publicLog2<GettingStartedActionEvent, GettingStartedActionClassification>('gettingStarted.ActionExecuted', { command: 'openRecent', argument: undefined, walkthroughId: this.currentWalkthrough?.id });
+ 				this.hostService.openWindow([windowOpenable], {
+@@ -1067,12 +1078,14 @@ export class GettingStartedPage extends EditorPane {
+ 			});
+ 			li.appendChild(link);
+ 
+-			const span = $('span');
+-			span.classList.add('path');
+-			span.classList.add('detail');
+-			span.innerText = parentPath;
+-			span.title = fullPath;
+-			li.appendChild(span);
++			if (parentPath) {
++				const span = $('span');
++				span.classList.add('path');
++				span.classList.add('detail');
++				span.innerText = parentPath;
++				span.title = fullPath;
++				li.appendChild(span);
++			}
+ 
+ 			const deleteButton = $('a.codicon.codicon-close.hide-category-button.recently-opened-delete-button', {
+ 				'tabindex': 0,
+@@ -1152,7 +1165,7 @@ export class GettingStartedPage extends EditorPane {
+ 	private buildStartList(): GettingStartedIndexList<IWelcomePageStartEntry> {
+ 		const renderStartEntry = (entry: IWelcomePageStartEntry): HTMLElement =>
+ 			$('li',
+-				{}, $('button.button-link',
++				{}, $(`button.button-link${entry.className ? `.${entry.className}` : ''}`,
+ 					{
+ 						'x-dispatch': 'selectStartEntry:' + entry.id,
+ 						title: entry.description + ' ' + this.getKeybindingLabel(entry.command),
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts
+index cc10f6cc139..6f6713c1830 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts
+@@ -17,4 +17,6 @@ export const welcomePageTileBorder = registerColor('welcomePage.tileBorder', { d
+ export const welcomePageProgressBackground = registerColor('welcomePage.progress.background', inputBackground, localize('welcomePage.progress.background', 'Foreground color for the Welcome page progress bars.'));
+ export const welcomePageProgressForeground = registerColor('welcomePage.progress.foreground', textLinkForeground, localize('welcomePage.progress.foreground', 'Background color for the Welcome page progress bars.'));
+ 
++export const welcomePageRuntimeFSForeground = registerColor('welcomePage.runtimeFSForeground', { light: '#26734D', dark: '#66CDAA', hcLight: '#006B3C', hcDark: '#66FFB3' }, localize('welcomePage.runtimeFSForeground', 'Foreground color for RuntimeFS entries on the Welcome page.'));
++
+ export const walkthroughStepTitleForeground = registerColor('walkthrough.stepTitle.foreground', { light: '#000000', dark: '#ffffff', hcDark: null, hcLight: null }, localize('walkthrough.stepTitle.foreground', 'Foreground color of the heading of each walkthrough step'));
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
+index a65e43393be..5ef4dff398e 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/media/gettingStarted.css
+@@ -1119,6 +1119,19 @@
+ 	border: inherit;
+ }
+ 
++/* RuntimeCode: RuntimeFS entries carry their own hue in both the Start list and
++   Recent, so a folder's origin reads at a glance without a path beside it. The
++   `button.` qualifier is what outspecifies the generic button.button-link rules
++   above; dropping it makes these silently lose on :hover. */
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs,
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs:hover,
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs:active,
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs .codicon,
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs:hover .codicon,
++.monaco-workbench .part.editor > .content .gettingStartedContainer button.button-link.runtimefs:active .codicon {
++	color: var(--vscode-welcomePage-runtimeFSForeground);
++}
++
+ .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .progress-bar-inner {
+ 	background-color: var(--vscode-welcomePage-progress-foreground);
+ }
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+index 168a3d01b40..5ed62126490 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+@@ -103,6 +103,7 @@ export type BuiltinGettingStartedStartEntry = {
+ 	title: string;
+ 	description: string;
+ 	icon: ThemeIcon;
++	className?: string;
+ 	when?: string;
+ 	content:
+ 	| { type: 'startEntry'; command: string };
+@@ -149,7 +150,7 @@ export const startEntries: GettingStartedStartEntryContent = [
+ 		title: localize('gettingStarted.openFolder.title', "Open Folder..."),
+ 		description: localize('gettingStarted.openFolder.description', "Open a folder to start working"),
+ 		icon: Codicon.folderOpened,
+-		when: '!isWeb && !isMac',
++		when: '!isMac',
+ 		content: {
+ 			type: 'startEntry',
+ 			command: 'command:workbench.action.files.openFolder',
+@@ -166,6 +167,30 @@ export const startEntries: GettingStartedStartEntryContent = [
+ 			command: 'command:workbench.action.files.openFolderViaWorkspace',
+ 		}
+ 	},
++	{
++		id: 'topLevelOpenRuntimeFSFolder',
++		title: localize('gettingStarted.openRuntimeFSFolder.title', "Open RuntimeFS Folder..."),
++		description: localize('gettingStarted.openRuntimeFSFolder.description', "Open a folder from RuntimeFS"),
++		icon: Codicon.folderOpened,
++		className: 'runtimefs',
++		when: 'isWeb',
++		content: {
++			type: 'startEntry',
++			command: 'command:runtimecode.openRfsFolder',
++		}
++	},
++	{
++		id: 'topLevelImportRuntimeFSFolder',
++		title: localize('gettingStarted.importRuntimeFSFolder.title', "Import RuntimeFS Folder..."),
++		description: localize('gettingStarted.importRuntimeFSFolder.description', "Copy a local folder into RuntimeFS"),
++		icon: Codicon.folderOpened,
++		className: 'runtimefs',
++		when: 'isWeb',
++		content: {
++			type: 'startEntry',
++			command: 'command:runtimecode.importRfsFolder',
++		}
++	},
+ 	{
+ 		id: 'topLevelGitClone',
+ 		title: localize('gettingStarted.topLevelGitClone.title', "Clone Git Repository..."),

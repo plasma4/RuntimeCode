@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>RuntimeCode SW/OPFS spike</title>
+	<style>
+		body { font: 13px ui-monospace, monospace; padding: 1rem; }
+		pre { background: #f4f4f4; padding: .5rem; white-space: pre-wrap; }
+	</style>
+</head>
+<body>
+	<h1>RuntimeCode spike</h1>
+	<pre id="out">running...</pre>
+	<script type="module">
+		// Results are also parked on window.__SPIKE__ for automation to read.
+		const results = { steps: [] };
+		const out = document.getElementById('out');
+		const log = (name, ok, detail) => {
+			results.steps.push({ name, ok, detail });
+			out.textContent = JSON.stringify(results, null, 1);
+		};
+
+		// --- Test 1: can a nested SW register inside an RFS virtual folder? --------
+		// Mirrors what VS Code's webview does: register a SW from a subdirectory,
+		// scoped to that subdirectory only.
+		let reg;
+		try {
+			reg = await navigator.serviceWorker.register('./sub/sw.js', { type: 'module', updateViaCache: 'none' });
+			log('nested-sw-register', true, { scope: reg.scope });
+		} catch (err) {
+			log('nested-sw-register', false, String(err));
+		}
+
+		// The registration fetch has to come back with a JS mime type. If RFS's SW
+		// mislabels it the register() above throws, so record the served type too.
+		try {
+			const res = await fetch('./sub/sw.js');
+			log('nested-sw-mime', /javascript/.test(res.headers.get('content-type') || ''), {
+				status: res.status,
+				type: res.headers.get('content-type')
+			});
+		} catch (err) {
+			log('nested-sw-mime', false, String(err));
+		}
+
+		if (reg) {
+			try {
+				await navigator.serviceWorker.ready;
+				// Wait for it to actually take control of its scope.
+				for (let i = 0; i < 50 && !reg.active; i++) { await new Promise(r => setTimeout(r, 100)); }
+				log('nested-sw-active', !!reg.active, { state: reg.active?.state });
+			} catch (err) {
+				log('nested-sw-active', false, String(err));
+			}
+		}
+
+		// --- Test 2: THE important one ----------------------------------------------
+		// Service workers do not chain. Once the nested SW owns the `sub/` scope,
+		// a request it declines to respondWith() falls through to the NETWORK, not
+		// back to RFS's SW. These files only exist in OPFS, so if that is what
+		// happens, they 404 and every webview past the first one breaks.
+		try {
+			const res = await fetch('./sub/asset.txt', { cache: 'no-store' });
+			const body = await res.text();
+			log('in-scope-passthrough', res.ok && body.includes('ASSET-OK'), {
+				status: res.status,
+				body: body.slice(0, 60),
+				note: 'ok=true means requests the nested SW ignores still reach OPFS'
+			});
+		} catch (err) {
+			log('in-scope-passthrough', false, String(err));
+		}
+
+		// Control: same fetch but outside the nested SW's scope. Should always work.
+		try {
+			const res = await fetch('./outside.txt', { cache: 'no-store' });
+			const body = await res.text();
+			log('out-of-scope-control', res.ok && body.includes('OUTSIDE-OK'), { status: res.status });
+		} catch (err) {
+			log('out-of-scope-control', false, String(err));
+		}
+
+		// --- Test 3: does a worker in a same-origin iframe see the same OPFS? -------
+		// This mirrors the web extension host: iframe -> worker -> OPFS.
+		try {
+			const detail = await new Promise((resolve, reject) => {
+				const timer = setTimeout(() => reject(new Error('iframe timeout')), 15000);
+				addEventListener('message', function onMsg(e) {
+					if (e.data?.__spike !== 'exthost') { return; }
+					clearTimeout(timer);
+					removeEventListener('message', onMsg);
+					resolve(e.data);
+				});
+				const f = document.createElement('iframe');
+				f.src = './sub/frame.html';
+				f.style.display = 'none';
+				document.body.appendChild(f);
+			});
+			log('exthost-opfs', detail.ok, detail);
+		} catch (err) {
+			log('exthost-opfs', false, String(err));
+		}
+
+		results.done = true;
+		out.textContent = JSON.stringify(results, null, 1);
+		window.__SPIKE__ = results;
+	</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+{
+	"name": "runtimefs",
+	"displayName": "RuntimeFS",
+	"description": "Opens RuntimeFS folders as workspaces, backed directly by OPFS.",
+	"version": "0.0.1",
+	"publisher": "runtimecode",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.137.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"browser": "./extension.js",
+	"activationEvents": [
+		"onFileSystem:rfs",
+		"onStartupFinished"
+	],
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "runtimecode.openRfsFolder",
+				"title": "Open RuntimeFS Folder...",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.newRfsFolder",
+				"title": "New RuntimeFS Folder...",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.importRfsFolder",
+				"title": "Import RuntimeFS Folder...",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.exportRfsFolder",
+				"title": "Export Folder Locally...",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.refreshRfs",
+				"title": "Refresh RuntimeFS Cache",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.showPreview",
+				"title": "Show Dev Preview to the Side",
+				"category": "RuntimeCode",
+				"icon": "$(open-preview)"
+			},
+			{
+				"command": "runtimecode.openPreviewInTab",
+				"title": "Open Dev Preview in New Tab",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.openTruePreviewInTab",
+				"title": "Open True Preview in New Tab",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.togglePreviewInspector",
+				"title": "Toggle Preview Inspector",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.reloadPreview",
+				"title": "Reload Dev Preview",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.enableSameOrigin",
+				"title": "Enable Dev Preview Same-Origin Headers",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.disableSameOrigin",
+				"title": "Disable Dev Preview Same-Origin Headers",
+				"category": "RuntimeCode"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "runtimecode.showPreview",
+				"key": "ctrl+alt+l ctrl+alt+p",
+				"mac": "cmd+l cmd+p"
+			},
+			{
+				"command": "runtimecode.openPreviewInTab",
+				"key": "alt+shift+l alt+shift+o"
+			},
+			{
+				"command": "runtimecode.openTruePreviewInTab",
+				"key": "alt+shift+l alt+o"
+			}
+		],
+		"configuration": {
+			"title": "RuntimeCode",
+			"properties": {
+				"runtimecode.preview.inspector": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable Eruda in Dev Preview. It is loaded only by Dev Preview."
+				},
+				"runtimecode.sameOrigin.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Maintain Cross-Origin-Embedder-Policy and Cross-Origin-Opener-Policy headers for the active RuntimeFS folder used by Dev Preview."
+				}
+			}
+		},
+		"menus": {
+			"menubar/file": [
+				{
+					"command": "runtimecode.importRfsFolder",
+					"group": "3_import_export"
+				},
+				{
+					"command": "runtimecode.exportRfsFolder",
+					"group": "3_import_export"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "runtimecode.showPreview",
+					"when": "resourceScheme == rfs && resourceExtname =~ /^\\.(html?|svg|md)$/",
+					"group": "navigation"
+				}
+			]
+		}
+	}
+}

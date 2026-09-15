@@ -1,0 +1,131 @@
+Make webviews work in a single-origin static build.
+
+Two independent causes, both silent, both fatal to every webview (markdown
+preview, notebooks, the settings UI):
+
+1. The host page proves it is on a dedicated per-webview origin by checking that
+   location.hostname equals a sha-256 of the parent origin. A static folder has
+   exactly one origin, so that can never hold. Accept the explicit same-origin
+   case instead.
+
+   Deliberate trade-off: webview content is then not isolated from workbench
+   storage (localStorage, IndexedDB, OPFS). Cross-origin deployments keep full
+   validation.
+
+2. Service worker script requests bypass service workers (the request carries
+   serviceWorkers:'none'), so a worker living only inside a RuntimeFS virtual
+   folder 404s and never registers. Register it from the real RuntimeFS host
+   root, and pass the webview directory as both an explicit narrower scope and
+   an explicit vscode-resource-root the worker reads back.
+
+Patching the inline script invalidates the sha-256 the page's own CSP pins for
+it, and the browser then blocks the script with no console entry. staticify.mjs
+recomputes that hash on every build.
+diff --git a/src/vs/workbench/contrib/webview/browser/pre/index.html b/src/vs/workbench/contrib/webview/browser/pre/index.html
+index 42c7c01ade5..8e4d00555f6 100644
+--- a/src/vs/workbench/contrib/webview/browser/pre/index.html
++++ b/src/vs/workbench/contrib/webview/browser/pre/index.html
+@@ -252,8 +252,25 @@
+ 				return reject(new Error('Service Workers are not enabled. Webviews will not work. Try disabling private/incognito mode.'));
+ 			}
+ 
+-			const swPath = encodeURI(`service-worker.js?v=${expectedWorkerVersion}&vscode-resource-base-authority=${searchParams.get('vscode-resource-base-authority')}&remoteAuthority=${searchParams.get('remoteAuthority') ?? ''}&platform=${searchParams.get('platform')}`);
+-			navigator.serviceWorker.register(swPath, { type: 'module', updateViaCache: 'none' })
++			// RuntimeCode: service worker script requests bypass service workers
++			// (the request carries serviceWorkers:'none'), so a worker that only
++			// exists inside a RuntimeFS virtual folder can never be fetched. When
++			// this webview is hosted from /n/<folder>/, register the worker from
++			// the real RuntimeFS host root instead. It still controls only this
++			// webview directory, which is passed as an explicit narrower scope.
++			const webviewDirectory = new URL('.', location.href);
++			const runtimeFsMatch = location.pathname.match(/^(.*)\/n\/[^/]+(?:\/|$)/);
++			const runtimeFsBase = runtimeFsMatch ? `${runtimeFsMatch[1]}/` : undefined;
++			const serviceWorkerUrl = runtimeFsBase
++				? new URL('rc-webview-sw.js', `${location.origin}${runtimeFsBase}`)
++				: new URL('service-worker.js', webviewDirectory);
++			serviceWorkerUrl.searchParams.set('vscode-resource-root', webviewDirectory.pathname.replace(/\/$/, ''));
++			serviceWorkerUrl.searchParams.set('v', String(expectedWorkerVersion));
++			serviceWorkerUrl.searchParams.set('vscode-resource-base-authority', searchParams.get('vscode-resource-base-authority') ?? '');
++			serviceWorkerUrl.searchParams.set('remoteAuthority', searchParams.get('remoteAuthority') ?? '');
++			serviceWorkerUrl.searchParams.set('platform', searchParams.get('platform') ?? '');
++			const swPath = serviceWorkerUrl.toString();
++			navigator.serviceWorker.register(swPath, { scope: webviewDirectory.pathname, type: 'module', updateViaCache: 'none' })
+ 				.then(async registration => {
+ 					if (navigator.serviceWorker.controller) {
+ 						// A previous SW is already controlling. Force an update
+@@ -281,6 +298,18 @@
+ 					if (!onElectron && error instanceof Error && error.message.includes('user denied permission')) {
+ 						return reject(new Error(`Could not register service worker. Please make sure third party cookies are enabled: ${error}`));
+ 					}
++					// RuntimeCode: a 404 here means the host-root worker was never
++					// deployed. That is by far the most common way this fails, and
++					// the raw registration error does not say what to do about it.
++					if (runtimeFsBase) {
++						return reject(new Error(
++							`Could not load the webview service worker from ${swPath}. ` +
++							`Either it was never uploaded to the RuntimeFS host root ` +
++							`(${location.origin}${runtimeFsBase}), or the copy there is from an older build. ` +
++							`Service worker scripts cannot be served from a RuntimeFS virtual folder, so that file ` +
++							`has to exist for real at that path, and it has to come from the same build as this ` +
++							`workbench. Upload dist/host-root/rc-webview-sw.js and reload. Underlying error: ${error}`));
++					}
+ 					return reject(new Error(`Could not register service worker: ${error}.`));
+ 				});
+ 		});
+@@ -332,6 +361,23 @@
+ 
+ 				const hostname = location.hostname;
+ 
++				// RuntimeCode: accept the explicit same-origin case.
++				//
++				// The check below proves the webview is served from a dedicated
++				// origin whose hostname is a hash of the parent origin (upstream uses
++				// a per-webview CDN subdomain). RuntimeCode ships as a static folder
++				// with exactly one origin available, so that can never hold and every
++				// webview — markdown preview, notebooks, the settings UI — silently
++				// fails to hand-shake and renders blank.
++				//
++				// Trade-off, deliberately: webview content is then NOT isolated from
++				// workbench storage (localStorage, IndexedDB, OPFS). That matches the
++				// threat model RuntimeFS already documents for the folders it serves
++				// from its own origin. Cross-origin deployments keep full validation.
++				if (parentOrigin === location.origin) {
++					return start(parentOrigin);
++				}
++
+ 				if (!crypto.subtle) {
+ 					// cannot validate, not running in a secure context
+ 					throw new Error(`'crypto.subtle' is not available so webviews will not work. This is likely because the editor is not running in a secure context (https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts).`);
+diff --git a/src/vs/workbench/contrib/webview/browser/pre/service-worker.js b/src/vs/workbench/contrib/webview/browser/pre/service-worker.js
+index 16616210daf..1b0e699aa2a 100644
+--- a/src/vs/workbench/contrib/webview/browser/pre/service-worker.js
++++ b/src/vs/workbench/contrib/webview/browser/pre/service-worker.js
+@@ -14,10 +14,26 @@ const maxActiveHostResourceResponseBodies = 32;
+ 
+ const resourceCacheName = `vscode-resource-cache-${VERSION}`;
+ 
+-const rootPath = sw.location.pathname.replace(/\/service-worker.js$/, '');
+-
+ const searchParams = new URL(location.toString()).searchParams;
+ 
++// RuntimeCode may serve this worker as a real host-root file while the
++// webview itself remains under a RuntimeFS virtual path. In that case the
++// worker URL and the webview directory are intentionally different.
++const rootPath = searchParams.get('vscode-resource-root') || sw.location.pathname.replace(/\/service-worker.js$/, '');
++
++// RuntimeCode: upstream ships this worker and the page that registers it in one
++// artifact, so their versions cannot disagree and `v` is only a cache-buster.
++// Here they are two separate uploads, and re-deploying one without the other is
++// easy to do. Fail loudly at install time instead of serving resources from a
++// worker that no longer matches the workbench.
++const expectedVersion = searchParams.get('v');
++if (expectedVersion !== null && Number(expectedVersion) !== VERSION) {
++	throw new Error(
++		`Webview service worker version mismatch: this worker is v${VERSION}, the workbench expects ` +
++		`v${expectedVersion}. The copy at the RuntimeFS host root is from a different build. ` +
++		`Re-upload dist/host-root/rc-webview-sw.js.`);
++}
++
+ const remoteAuthority = searchParams.get('remoteAuthority');
+ const shouldLimitHostResourceResponseBodies = searchParams.get('platform') === 'electron';
+ 

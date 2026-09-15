@@ -1,0 +1,123 @@
+{
+	"_comment": [
+		"Known Microsoft-endpoint strings in the build output, each with the reason it",
+		"is not a live beacon. check-endpoints.mjs fails on anything NOT listed here,",
+		"so an upgrade that reintroduces a real endpoint is caught.",
+		"",
+		"Reasons written against 1.131.0; the file list still matches exactly at",
+		"1.137.0, with no new unexplained hits. Re-verify on upgrade rather than",
+		"extending blindly: the point of the list is that adding to it requires a",
+		"justification."
+	],
+	"allow": [
+		{
+			"pattern": "vscode-cdn.net",
+			"files": [
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js",
+				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
+			],
+			"reason": "Dead fallback in environmentService.ts:239 — `productService.webviewContentExternalBaseUrlTemplate || 'https://{{uuid}}.vscode-cdn.net/...'`. staticify.mjs sets options.webviewEndpoint, which wins at line 237, so the fallback is unreachable. Confirmed by runtime network capture."
+		},
+		{
+			"pattern": "vscode-cdn.net",
+			"files": [
+				"app/out/vs/editor/common/services/editorWebWorkerMain.js",
+				"app/out/vs/sessions/sessions.web.main.internal.css",
+				"app/out/vs/workbench/contrib/notebook/common/services/notebookWebWorkerMain.js",
+				"app/out/vs/workbench/contrib/output/common/outputLinkComputerMain.js",
+				"app/out/vs/workbench/services/keybinding/browser/keyboardLayouts/layout.contribution.darwin.js",
+				"app/out/vs/workbench/services/keybinding/browser/keyboardLayouts/layout.contribution.linux.js",
+				"app/out/vs/workbench/services/keybinding/browser/keyboardLayouts/layout.contribution.win.js",
+				"app/out/vs/workbench/services/languageDetection/browser/languageDetectionWebWorkerMain.js",
+				"app/out/vs/workbench/services/search/worker/localFileSearchMain.js",
+				"app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js",
+				"app/out/vs/workbench/workbench.web.main.internal.css"
+			],
+			"reason": "Absolute sourceMappingURL comments emitted by the minified VS Code web package. Browsers only fetch a source map when developer tools request it; RuntimeCode neither executes nor otherwise contacts vscode-cdn.net through these comments. The deployed static build does not ship a sourcemaps directory."
+		},
+		{
+			"pattern": "copilot_internal",
+			"files": [
+				"app/index.html",
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js",
+				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
+			],
+			"reason": "product.defaultChatAgent entitlement URLs, plus path fragments appended to a user-configured GitHub Enterprise host. defaultChatAgent cannot be removed (onboardingVariationA.ts:80 asserts it at module scope), so these stay as inert config. Nothing reads them because extensions/copilot is not bundled — the entitlement flow only runs from that extension."
+		},
+		{
+			"pattern": "api.github.com/copilot",
+			"files": [
+				"app/index.html",
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js",
+				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
+			],
+			"reason": "Same defaultChatAgent entitlement/MCP-registry URLs. Inert without the Copilot extension. If you later install Copilot from the gallery these become live — that is the user's choice to make, which is why they are left configured rather than blanked."
+		},
+		{
+			"pattern": "marketplace.visualstudio.com",
+			"files": [
+				"app/out/nls.messages.js",
+				"app/out/nls.messages.json",
+				"app/out/nls.metadata.json",
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js"
+			],
+			"reason": "Documentation link inside a localized UI string (the Dev Containers pointer). Rendered as text, never fetched."
+		},
+		{
+			"pattern": "aka.ms",
+			"files": [
+				"app/index.html",
+				"app/out/nls.messages.js",
+				"app/out/nls.messages.json",
+				"app/out/nls.metadata.json",
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js",
+				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js",
+				"app/extensions/html-language-features/server/dist/browser/htmlServerMain.js",
+				"app/extensions/typescript-language-features/dist/browser/extension.js",
+				"app/extensions/typescript-language-features/dist/browser/typescript/tsserver.web.js",
+				"app/extensions/typescript-language-features/dist/browser/typescript/*/diagnosticMessages.generated.json"
+			],
+			"reason": "Documentation links in UI strings and in TypeScript compiler diagnostic text (`Learn more at https://aka.ms/tsconfig`). Displayed, never requested."
+		},
+		{
+			"pattern": "mobile.events.data.microsoft.com",
+			"files": [
+				"app/out/vs/workbench/workbench.web.main.internal.js",
+				"app/out/vs/sessions/sessions.web.main.internal.js"
+			],
+			"reason": "The 1DS collector URL is a module-level constant in platform/telemetry/common/1dsAppender.ts, but the appender is only constructed at telemetryService.ts:112, which requires productService.aiConfig?.ariaKey. The OSS product.json has no aiConfig — that key lives in the private distro mixin — so no appender is ever created and the constant is dead. Confirmed by runtime network capture."
+		},
+		{
+			"pattern": "mobile.events.data.microsoft.com",
+			"files": [
+				"app/extensions/github-authentication/dist/browser/extension.js",
+				"app/extensions/markdown-language-features/dist/browser/extension.js",
+				"app/extensions/merge-conflict/dist/browser/mergeConflictMain.js",
+				"app/extensions/typescript-language-features/dist/browser/extension.js"
+			],
+			"reason": "Same 1DS SDK, bundled into Microsoft-authored built-in extensions. Gated on vscode.env.isTelemetryEnabled, which is false by default here. See the dc.services entry."
+		},
+		{
+			"pattern": "default.exp-tas.com",
+			"files": [
+				"app/extensions/github-authentication/dist/browser/extension.js"
+			],
+			"reason": "The TAS experimentation endpoint, reached through tas-client inside github-authentication. It only runs once that extension activates, which requires the user to start a GitHub sign-in, and it respects the telemetry setting. This is the least inert entry in this file: if you want it gone, drop github-authentication from the web bundle (it is opt-in and nothing else depends on it)."
+		},
+		{
+			"pattern": "dc.services.visualstudio.com",
+			"files": [
+				"app/extensions/github-authentication/dist/browser/extension.js",
+				"app/extensions/markdown-language-features/dist/browser/extension.js",
+				"app/extensions/merge-conflict/dist/browser/mergeConflictMain.js",
+				"app/extensions/typescript-language-features/dist/browser/extension.js"
+			],
+			"reason": "The ApplicationInsights SDK bundled into Microsoft-authored built-in extensions via @vscode/extension-telemetry. This is real telemetry code, not a doc string — but it gates on vscode.env.isTelemetryEnabled, which is false because configurationDefaults sets telemetry.telemetryLevel to 'off'. Left present rather than stripped so the user retains the choice, per the settings-based approach. Drop these extensions from the bundle if you want the code gone entirely."
+		}
+	]
+}

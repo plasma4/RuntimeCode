@@ -76,9 +76,9 @@ if (!existsSync(path.join(APP_OUT, 'index.html'))) {
 }
 
 if (problems.length > 0) {
-	console.error(`\n[check-deploy] FAIL — ${problems.length} problem(s):\n`);
+	console.error(`\n[check-deploy] FAIL: ${problems.length} problem(s):\n`);
 	for (const problem of problems) { console.error(`  ${problem}\n`); }
 	process.exit(1);
 }
 
-console.log('[check-deploy] OK — both halves of the deployment are in place');
+console.log('[check-deploy] OK: both halves of the deployment are in place');

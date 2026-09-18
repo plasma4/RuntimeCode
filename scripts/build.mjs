@@ -5,7 +5,7 @@
  *   node scripts/build.mjs --min      # release: minified
  *   node scripts/build.mjs --full     # force a full recompile
  *
- * Build-speed notes (measured on this machine, see docs in the plan):
+ * Build-speed notes, measured on an M5/48GB (see the README for the numbers):
  *  - the `-ci` gulp variants skip compileBuildWithManglingTask and reuse
  *    out-build/, which is the difference between a cold and a warm build
  *  - the unminified target skips the esbuild minify pass entirely
@@ -41,7 +41,7 @@ function haveWarmCompile() {
 	const marker = path.join(VSCODE_ROOT, 'out-build', 'vs', 'workbench', 'workbench.web.main.internal.js');
 	const warm = existsSync(marker);
 	if (!warm && existsSync(path.join(VSCODE_ROOT, 'out-build'))) {
-		console.log('[build] out-build/ present but incomplete — recompiling');
+		console.log('[build] out-build/ present but incomplete, recompiling');
 	}
 	return warm;
 }

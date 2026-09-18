@@ -13,9 +13,9 @@
 		RuntimeCode's own bootstrap.
 
 		The upstream out/vs/code/browser/workbench/workbench.html is NOT usable
-		for this target: build/next/index.ts:179-185 builds the `web` target with
+		for this target: build/next/index.ts:181-186 builds the `web` target with
 		"web workbench only (no browser shell)", so vs/code/browser/workbench/
-		workbench.js is never emitted — only server-web gets it. The vscode-web
+		workbench.js is never emitted. Only server-web gets it. The vscode-web
 		bundle is meant to be driven by an embedder calling create() directly,
 		which is what this file does. That is also what we want, since the RFS
 		workspace and filesystem providers plug in here.
@@ -98,7 +98,7 @@
 
 		// The RuntimeFS extension ships beside the workbench and is registered as a
 		// built-in. The URI has to be built at runtime because the folder can be
-		// served from any path — including /n/<Folder>/ inside RuntimeFS itself.
+		// served from any path, including /n/<Folder>/ inside RuntimeFS itself.
 		const runtimefsExtension = URI.parse(
 			new URL('./rc-extensions/runtimefs/', window.location.href).toString()
 		);
@@ -227,7 +227,7 @@
 			return true;
 		};
 
-		// Must be absolute: webviewElement.ts:584 parses this and compares
+		// Must be absolute: webviewElement.ts:585 parses this and compares
 		// scheme://authority against the origin of messages coming from the
 		// webview iframe. A relative value parses to "://" and every webview
 		// message is dropped. Computed here so the folder stays portable.

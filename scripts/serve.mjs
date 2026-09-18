@@ -13,7 +13,7 @@
  *
  * --simulate-rfs mimics RuntimeFS's virtual path layout without RuntimeFS, so
  * the live-preview URL derivation can be exercised locally. It does NOT
- * exercise RuntimeFS's service worker — test that in a real deployment.
+ * exercise RuntimeFS's service worker. Test that in a real deployment.
  *
  * Deliberately dumb: no rewriting, no injected headers. If the build needs a
  * server to do something clever for it, it is not actually static.

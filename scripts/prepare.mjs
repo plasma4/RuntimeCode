@@ -36,7 +36,7 @@ function checkoutPin() {
 	}
 	console.log(`[prepare] checking out ${pin} (was ${current})`);
 	run('git', ['checkout', pin], { cwd: VSCODE_ROOT });
-	console.log('[prepare] NOTE: dependencies may differ across tags — rerun `npm ci` if the build fails');
+	console.log('[prepare] NOTE: dependencies may differ across tags. Rerun `npm ci` if the build fails');
 }
 
 function resetTouchedFiles() {
@@ -45,7 +45,7 @@ function resetTouchedFiles() {
 	// would happily preserve a previous patch application and make this script
 	// non-idempotent. For the same reason this has to run BEFORE the tag
 	// checkout, which would otherwise carry that staged application across.
-	// Untracked files are left alone so out-build/ and .build/ survive — losing
+	// Untracked files are left alone so out-build/ and .build/ survive. Losing
 	// them turns a 33s rebuild into a 15 minute one.
 	run('git', ['reset', '--hard', 'HEAD'], { cwd: VSCODE_ROOT });
 }

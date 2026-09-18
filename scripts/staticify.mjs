@@ -18,7 +18,7 @@
 import { cpSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { deepMerge, VSCODE_ROOT, GULP_OUT, APP_OUT, HOST_OUT, DIST, RC_ROOT } from './lib.mjs';
+import { deepMerge, rebrandNlsMessages, VSCODE_ROOT, GULP_OUT, APP_OUT, HOST_OUT, DIST, RC_ROOT } from './lib.mjs';
 
 const WEBVIEW_SW_NAME = 'rc-webview-sw.js';
 
@@ -39,7 +39,7 @@ Verify a deployment with:  node scripts/check-deploy.mjs <url-of-runtimecode>
 const ERUDA_URL = 'https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.js';
 const ERUDA_SHA256 = '332f95b14b1dc53cdbe6042e0ea95ac6025ac691c285d51b647c64360fe939e2';
 
-/** Matches webClientServer.ts:320 — the config lands in an HTML attribute. */
+/** Matches asJSON in webClientServer.ts:361. The config lands in an HTML attribute. */
 function asJSON(value) {
 	return JSON.stringify(value).replace(/"/g, '&quot;');
 }
@@ -49,20 +49,30 @@ function buildProductConfiguration() {
 	const overlay = JSON.parse(readFileSync(path.join(RC_ROOT, 'product.overlay.json'), 'utf8'));
 	const merged = deepMerge(product, overlay);
 
-	// Mirrors webClientServer.ts:356 so telemetry-related code can tell how it was embedded.
+	// Mirrors webClientServer.ts:397 so telemetry-related code can tell how it was embedded.
 	merged.embedderIdentifier = 'runtimecode-static';
 	return merged;
 }
 
 /**
- * Defaults, not locks — the user keeps every setting. Telemetry is already inert
+ * Defaults, not locks. The user keeps every setting. Telemetry is already inert
  * in an OSS build (no aiConfig.ariaKey for telemetryUtils.ts:125 to gate on);
  * these make the intent explicit and switch off the remaining network chatter.
  */
 const configurationDefaults = {
-	// A default, not a lock — the user can change it in Settings like any other.
+	// A default, not a lock. The user can change it in Settings like any other.
 	// `Dark 2026` is the theme id contributed by extensions/theme-defaults.
 	'workbench.colorTheme': 'Dark 2026',
+
+	// Copilot is not bundled and cannot be installed here: Open VSX has no
+	// GitHub.copilot or GitHub.copilot-chat, so the built-in setup flow would ask
+	// the gallery for an extension that is not in it. Leaving the chat UI visible
+	// therefore only offers a status bar entry and a sign-in that go nowhere.
+	// `sentiment.hidden` follows this setting (chatEntitlementService.ts:1507),
+	// which removes the entry. It stays a default, not a lock: point
+	// extensionsGallery at a registry that carries Copilot, set this to false,
+	// and the whole UI comes back.
+	'chat.disableAIFeatures': true,
 
 	'telemetry.telemetryLevel': 'off',
 	'telemetry.feedback.enabled': false,
@@ -78,13 +88,14 @@ const configurationDefaults = {
 
 function buildWorkbenchConfiguration() {
 	return {
-		// Deliberately absent vs. webClientServer.ts:375 — there is no server:
-		// no remoteAuthority, no connectionToken, no callbackRoute, no serverBasePath.
+		// Deliberately absent vs. webClientServer.ts:416, because there is no
+		// server: no remoteAuthority, connectionToken, callbackRoute or
+		// serverBasePath.
 
 		productConfiguration: buildProductConfiguration(),
 
 		// NOTE: webviewEndpoint is intentionally NOT set here. It must be an
-		// ABSOLUTE url: webviewElement.ts:584 does URI.parse(endpoint) and compares
+		// ABSOLUTE url: webviewElement.ts:585 does URI.parse(endpoint) and compares
 		// scheme://authority against the origin of incoming webview messages. A
 		// relative endpoint parses to "://" , so every webview message is silently
 		// dropped and webviews never initialise. static/index.html computes the
@@ -103,7 +114,7 @@ function buildWorkbenchConfiguration() {
 /**
  * The webview host page pins the sha256 of its own inline module script in a
  * CSP `script-src`. Any patch to that script invalidates the hash and the
- * browser then blocks the script *silently* — no error event, no console entry
+ * browser then blocks the script *silently*: no error event, no console entry
  * reachable from the page, just a webview that never hands-shakes and renders
  * blank. That failure mode cost a lot to diagnose once; recompute the hash here
  * so it cannot recur.
@@ -131,6 +142,34 @@ function repairWebviewCspHash() {
 
 	writeFileSync(file, html.replace(`'sha256-${csp[1]}'`, `'sha256-${actual}'`));
 	console.log(`[staticify] repaired webview CSP hash -> sha256-${actual}`);
+}
+
+/**
+ * Renames the product in the handful of built-in strings that name it on screen,
+ * the Welcome page above all. The workbench reads nls.messages.js at startup;
+ * nls.messages.json is the same array as data, and the two are kept in step so
+ * nothing downstream reads a stale copy.
+ */
+function rebrandWelcomeStrings(productName) {
+	const out = path.join(APP_OUT, 'out');
+	const keys = JSON.parse(readFileSync(path.join(out, 'nls.keys.json'), 'utf8'));
+	const messages = rebrandNlsMessages(
+		keys,
+		JSON.parse(readFileSync(path.join(out, 'nls.messages.json'), 'utf8')),
+		productName
+	);
+
+	writeFileSync(path.join(out, 'nls.messages.json'), JSON.stringify(messages));
+
+	const scriptPath = path.join(out, 'nls.messages.js');
+	const script = readFileSync(scriptPath, 'utf8');
+	const marker = 'globalThis._VSCODE_NLS_MESSAGES=';
+	const at = script.indexOf(marker);
+	if (at === -1) {
+		throw new Error(`No ${marker} in nls.messages.js; the workbench would start unbranded.`);
+	}
+	writeFileSync(scriptPath, `${script.slice(0, at + marker.length)}${JSON.stringify(messages)};\n`);
+	console.log(`[staticify] rebranded built-in welcome strings to ${productName}`);
 }
 
 async function vendorEruda() {
@@ -178,7 +217,7 @@ async function main() {
 	// We ship our own bootstrap rather than substituting upstream's
 	// workbench.html. That file loads vs/code/browser/workbench/workbench.js,
 	// the "browser shell", which the `web` build target deliberately does not
-	// emit — see build/next/index.ts:179-185 ("web workbench only (no browser
+	// emit. See build/next/index.ts:181-186 ("web workbench only (no browser
 	// shell)"); only server-web builds it. The vscode-web bundle is designed to
 	// be driven by an embedder calling create() directly, so static/index.html
 	// does that.
@@ -205,12 +244,14 @@ async function main() {
 	// upstream surfaces here rather than as a blank page in the browser.
 	const webMain = path.join(APP_OUT, 'out', 'vs', 'workbench', 'workbench.web.main.internal.js');
 	if (!existsSync(webMain)) {
-		throw new Error(`Missing ${path.relative(APP_OUT, webMain)} — the web entry point did not build.`);
+		throw new Error(`Missing ${path.relative(APP_OUT, webMain)}: the web entry point did not build.`);
 	}
+
+	rebrandWelcomeStrings(buildProductConfiguration().nameLong);
 
 	// RuntimeCode's own extensions ship alongside the workbench and are wired up
 	// as additionalBuiltinExtensions by the bootstrap. They are plain CommonJS
-	// with no build step — the web extension host loads them with
+	// with no build step, because the web extension host loads them with
 	// `new Function('module','exports','require', src)`.
 	const extensionsSrc = path.join(RC_ROOT, 'extensions');
 	if (existsSync(extensionsSrc)) {

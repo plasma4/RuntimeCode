@@ -24,9 +24,10 @@ producing a browser build that works.
 
 Then `gulp` builds the `vscode-web` target, and `staticify.mjs` turns the result
 into something a dumb static host can serve: it writes `index.html` from our own
-bootstrap, copies in the RuntimeFS extension, and repairs two things the build
-gets wrong for this deployment. Finally `check-endpoints.mjs` refuses to let a
-Microsoft endpoint sneak back in.
+bootstrap, copies in the RuntimeFS extension, renames the product in the built-in
+strings that name it on screen, and repairs two things the build gets wrong for
+this deployment. Finally `check-endpoints.mjs` refuses to let a Microsoft endpoint
+sneak back in.
 
 Output lands in `dist/`, in two parts that go to two different places. See
 [Deploying](#deploying), and do not skip the second one.
@@ -47,6 +48,7 @@ is an input and it is enormous. It defaults to `../vscode`; set
 | `extensions/runtimefs/` | The web extension providing the `rfs:` filesystem |
 | `scripts/` | prepare, build, staticify, check-endpoints, check-deploy, upgrade, serve |
 | `fixtures/` | Sample project served at `/n/<name>/` by `serve.mjs --simulate-rfs` |
+| `test/` | Tests for the RuntimeFS extension, run with `node --test test/` |
 | `spikes/` | Standalone browser experiments |
 | `dist/` | Build output, gitignored |
 
@@ -125,12 +127,19 @@ only turned up during the next upgrade.
 
 `defaultChatAgent` has to stay in `product.json`.
 `welcomeOnboarding/browser/onboardingVariationA.ts:80` calls
-`assertDefined(product.defaultChatAgent)` at module scope, and roughly 38 other
-sites read fields off it. Remove it and the workbench will not construct at all.
-Copilot is disabled by not bundling the extension instead, which also leaves the
-door open to installing it from the gallery later.
+`assertDefined(product.defaultChatAgent)` at module scope, and around 50 other
+files read fields off it. Remove it and the workbench will not construct at all.
 
-Upstream's `workbench.html` is unusable here. `build/next/index.ts:179-185` builds
+So Copilot is turned off twice over, in the two places that actually work. The
+extension is not bundled, and `chat.disableAIFeatures` defaults to `true`, which
+sets `sentiment.hidden` (`chatEntitlementService.ts:1507`) and takes the chat
+status bar entry with it. Without that default the entry sits there advertising a
+product this build cannot install: Open VSX carries neither `GitHub.copilot` nor
+`GitHub.copilot-chat`, so the setup flow asks the gallery for an extension that is
+not in it. Both halves are reversible. Point `extensionsGallery` at a registry
+that has Copilot and set `chat.disableAIFeatures` to false, and the UI returns.
+
+Upstream's `workbench.html` is unusable here. `build/next/index.ts:181-186` builds
 the `web` target as "web workbench only (no browser shell)", so
 `vs/code/browser/workbench/workbench.js` is never emitted and only `server-web`
 gets it. `static/index.html` is our own bootstrap, calling the exported `create()`
@@ -157,7 +166,7 @@ browser blocks it silently. No error event, no reachable console entry, just a
 webview that never hands-shakes. `staticify.mjs` recomputes the hash on every
 build so this cannot recur.
 
-`webviewEndpoint` must be absolute. `webviewElement.ts:584` does
+`webviewEndpoint` must be absolute. `webviewElement.ts:585` does
 `URI.parse(endpoint)` and compares `scheme://authority` against the origin of
 incoming webview messages. A relative endpoint parses to `"://"` and every message
 is dropped. `static/index.html` computes it from `window.location`, which keeps the
@@ -188,7 +197,13 @@ filesystem provider viable.
 output and registered by the bootstrap through `additionalBuiltinExtensions`. It
 is plain CommonJS with no build step, because the web extension host loads
 extensions with `new Function('module','exports','require', src)`
-(`extHostExtensionService.ts:59`).
+(`extHostExtensionService.ts:87`).
+
+That rules out TypeScript, so the file is checked JavaScript instead: `@ts-check`
+with JSDoc types, `extensions/runtimefs/jsconfig.json` in strict mode, and
+`scripts/typecheck.mjs` to run `tsc` over it. That script also copies
+`vscode.d.ts` out of the checkout into the gitignored `extensions/types/`, which
+is how `require('vscode')` resolves without an npm install in this repo.
 
 It provides the `rfs:` scheme, mapping `rfs:/<Folder>/<path>` onto OPFS
 `rfs/<Folder>/<path>`, the same tree RuntimeFS serves from, so edits are live at

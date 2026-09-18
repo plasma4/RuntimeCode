@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  RuntimeCode — RuntimeFS integration
+ *  RuntimeCode: RuntimeFS integration
  *  Licensed under the MIT License.
  *--------------------------------------------------------------------------------------------*/
 // @ts-check
@@ -15,6 +15,18 @@ const vscode = require("vscode");
 const RFS_PREFIX = "rfs";
 const SYSTEM_FILE = "rfs_system.json";
 const SCHEME = "rfs";
+
+/**
+ * One folder's entry in rfs_system.json. RuntimeFS owns the shape. We only
+ * ever merge into it, never rewrite it wholesale.
+ *
+ * @typedef {object} RegistryEntry
+ * @property {string | null} [encryptionType]
+ * @property {string} [headers] Custom Headers, one `* -> Name: value` per line.
+ * @property {number} [lastModified]
+ *
+ * @typedef {Record<string, RegistryEntry>} Registry
+ */
 
 // ---------------------------------------------------------------------------
 // OPFS helpers
@@ -34,8 +46,27 @@ async function rfsRoot(create = false) {
 }
 
 /**
+ * The name of a thrown DOMException, or undefined for anything else.
+ * Duck-typed rather than `instanceof Error`, because what OPFS rejects with is
+ * only guaranteed to carry a name.
+ *
+ * @param {unknown} err
+ * @returns {string | undefined}
+ */
+function errorName(err) {
+  if (typeof err !== "object" || err === null || !("name" in err)) {
+    return undefined;
+  }
+  const { name } = err;
+  return typeof name === "string" ? name : undefined;
+}
+
+/**
  * `rfs:/<Folder>/a/b.txt` -> { folder: '<Folder>', parts: ['a','b.txt'] }.
  * The workspace root is `rfs:/<Folder>`, so parts is empty there.
+ *
+ * @param {vscode.Uri} uri
+ * @returns {{ folder: string, parts: string[] }}
  */
 function parseUri(uri) {
   const segments = uri.path.split("/").filter(Boolean).map(decodeURIComponent);
@@ -45,9 +76,15 @@ function parseUri(uri) {
   return { folder: segments[0], parts: segments.slice(1) };
 }
 
-/** Maps OPFS/DOM errors onto the FileSystemError values VS Code expects. */
+/**
+ * Maps OPFS/DOM errors onto the FileSystemError values VS Code expects.
+ *
+ * @param {unknown} err
+ * @param {vscode.Uri} uri
+ * @returns {Error}
+ */
 function toFileSystemError(err, uri) {
-  const name = err && err.name;
+  const name = errorName(err);
   if (name === "NotFoundError") {
     return vscode.FileSystemError.FileNotFound(uri);
   }
@@ -63,6 +100,13 @@ function toFileSystemError(err, uri) {
   return err instanceof Error ? err : new Error(String(err));
 }
 
+/**
+ * @param {vscode.Uri} uri
+ * @param {{ create?: boolean, depth?: number }} [options] `depth` stops that
+ *   many segments short of the full path, which is how the parent directory of
+ *   a file is reached.
+ * @returns {Promise<FileSystemDirectoryHandle>}
+ */
 async function directoryHandleFor(uri, { create = false, depth = 0 } = {}) {
   const { folder, parts } = parseUri(uri);
   const root = await rfsRoot(create);
@@ -74,6 +118,11 @@ async function directoryHandleFor(uri, { create = false, depth = 0 } = {}) {
   return dir;
 }
 
+/**
+ * @param {vscode.Uri} uri
+ * @param {boolean} [create]
+ * @returns {Promise<FileSystemFileHandle>}
+ */
 async function fileHandleFor(uri, create = false) {
   const { parts } = parseUri(uri);
   if (parts.length === 0) {
@@ -91,10 +140,14 @@ async function fileHandleFor(uri, create = false) {
  * Mirrors updateRegistryEntry() in rfs.js, including its lock name, so the
  * RuntimeFS UI and RuntimeCode cannot corrupt rfs_system.json by writing at the
  * same time. Passing `data === null` deletes the entry.
+ *
+ * @param {string} name
+ * @param {RegistryEntry | null} data
  */
 async function updateRegistryEntry(name, data) {
   const write = async () => {
     const root = await opfsRoot();
+    /** @type {Registry} */
     let registry = {};
     try {
       const handle = await root.getFileHandle(SYSTEM_FILE);
@@ -130,6 +183,7 @@ async function updateRegistryEntry(name, data) {
   return write();
 }
 
+/** @returns {Promise<Registry>} */
 async function readRegistry() {
   try {
     const root = await opfsRoot();
@@ -147,6 +201,8 @@ async function readRegistry() {
  * invisible to a preview tab until it is told to drop them. Best-effort: the
  * extension host worker has no ServiceWorkerContainer, so this is relayed
  * through the workbench via a command the bootstrap registers.
+ *
+ * @param {string} folder
  */
 async function invalidateFolderCache(folder) {
   try {
@@ -159,7 +215,14 @@ async function invalidateFolderCache(folder) {
   }
 }
 
-/** Matches the per-folder write lock rfs.js takes in performSyncToOpfs(). */
+/**
+ * Matches the per-folder write lock rfs.js takes in performSyncToOpfs().
+ *
+ * @template T
+ * @param {string} folder
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
 async function withFolderLock(folder, fn) {
   if (!navigator.locks) {
     return fn();
@@ -171,11 +234,17 @@ async function withFolderLock(folder, fn) {
 // FileSystemProvider
 // ---------------------------------------------------------------------------
 
+/** @implements {vscode.FileSystemProvider} */
 class RuntimeFSProvider {
   constructor() {
-    this._emitter = new vscode.EventEmitter();
+    this._emitter =
+      /** @type {vscode.EventEmitter<vscode.FileChangeEvent[]>} */ (
+        new vscode.EventEmitter()
+      );
     this.onDidChangeFile = this._emitter.event;
+    /** @type {vscode.FileChangeEvent[]} */
     this._bufferedEvents = [];
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     this._fireSoonHandle = undefined;
   }
 
@@ -186,6 +255,10 @@ class RuntimeFSProvider {
     return new vscode.Disposable(() => {});
   }
 
+  /**
+   * @param {vscode.Uri} uri
+   * @returns {Promise<vscode.FileStat>}
+   */
   async stat(uri) {
     const { parts } = parseUri(uri);
     try {
@@ -204,7 +277,7 @@ class RuntimeFSProvider {
           size: file.size,
         };
       } catch (err) {
-        if (err && err.name === "TypeMismatchError") {
+        if (errorName(err) === "TypeMismatchError") {
           await directoryHandleFor(uri);
           return {
             type: vscode.FileType.Directory,
@@ -220,9 +293,14 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} uri
+   * @returns {Promise<[string, vscode.FileType][]>}
+   */
   async readDirectory(uri) {
     try {
       const dir = await directoryHandleFor(uri);
+      /** @type {[string, vscode.FileType][]} */
       const entries = [];
       for await (const [name, handle] of dir.entries()) {
         entries.push([
@@ -238,6 +316,7 @@ class RuntimeFSProvider {
     }
   }
 
+  /** @param {vscode.Uri} uri */
   async createDirectory(uri) {
     try {
       const { folder } = parseUri(uri);
@@ -250,6 +329,10 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} uri
+   * @returns {Promise<Uint8Array>}
+   */
   async readFile(uri) {
     try {
       const file = await (await fileHandleFor(uri)).getFile();
@@ -259,6 +342,11 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} uri
+   * @param {Uint8Array} content
+   * @param {{ create: boolean, overwrite: boolean }} options
+   */
   async writeFile(uri, content, options) {
     const { folder } = parseUri(uri);
     try {
@@ -279,7 +367,7 @@ class RuntimeFSProvider {
       await withFolderLock(folder, async () => {
         const handle = await fileHandleFor(uri, true);
         const writable = await handle.createWritable();
-        await writable.write(content);
+        await writable.write(/** @type {BufferSource} */ (content));
         await writable.close();
       });
 
@@ -295,6 +383,10 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} uri
+   * @param {{ recursive: boolean }} options
+   */
   async delete(uri, options) {
     const { folder, parts } = parseUri(uri);
     if (parts.length === 0) {
@@ -316,6 +408,11 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} oldUri
+   * @param {vscode.Uri} newUri
+   * @param {{ overwrite: boolean }} options
+   */
   async rename(oldUri, newUri, options) {
     // OPFS has no atomic move, so this is copy-then-delete.
     const { folder } = parseUri(oldUri);
@@ -342,6 +439,11 @@ class RuntimeFSProvider {
     }
   }
 
+  /**
+   * @param {vscode.Uri} from
+   * @param {vscode.Uri} to
+   * @param {{ overwrite: boolean }} options
+   */
   async _copyDirectory(from, to, options) {
     await this.createDirectory(to);
     for (const [name, type] of await this.readDirectory(from)) {
@@ -358,7 +460,11 @@ class RuntimeFSProvider {
     }
   }
 
-  /** Coalesces events so a bulk write does not produce one notification per file. */
+  /**
+   * Coalesces events so a bulk write does not fire one event per file.
+   *
+   * @param {...vscode.FileChangeEvent} events
+   */
   _fireSoon(...events) {
     this._bufferedEvents.push(...events);
     if (this._fireSoonHandle) {
@@ -395,6 +501,10 @@ async function listFolders() {
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * @param {string} name
+ * @returns {vscode.Uri}
+ */
 function folderUri(name) {
   return vscode.Uri.from({ scheme: SCHEME, path: `/${name}` });
 }
@@ -484,18 +594,22 @@ async function exportRfsFolder() {
     return;
   }
 
-  const workspaceFolder = vscode.workspace.workspaceFolders?.find(
+  // showQuickPick has no way to preselect an item, so the folder that is open
+  // goes to the top of the list instead. The `activeItem` option this used to
+  // pass belongs to the QuickPick object API and was quietly ignored here.
+  const open = vscode.workspace.workspaceFolders?.find(
     (folder) => folder.uri.scheme === SCHEME,
   );
-  const activeItem = workspaceFolder
-    ? folders.find(
-        (name) => folderUri(name).toString() === workspaceFolder.uri.toString(),
-      )
+  const openName = open
+    ? folders.find((name) => folderUri(name).toString() === open.uri.toString())
     : undefined;
-  const picked = await vscode.window.showQuickPick(folders, {
+  const ordered = openName
+    ? [openName, ...folders.filter((name) => name !== openName)]
+    : folders;
+
+  const picked = await vscode.window.showQuickPick(ordered, {
     title: "Export RuntimeFS Folder",
     placeHolder: "Select a folder to save locally as .tar.gz",
-    activeItem,
   });
   if (!picked) {
     return;
@@ -518,7 +632,7 @@ async function exportRfsFolder() {
 //
 // Everything below lives in this file on purpose: the web extension host
 // resolves `require` only for registered factories such as 'vscode'
-// (extHostExtensionService.ts:107), so a relative require would throw
+// (extHostExtensionService.ts:109), so a relative require would throw
 // "Cannot load module". Web extensions have to be a single file unless you add
 // a bundler, and this one is small enough not to need one.
 // ---------------------------------------------------------------------------
@@ -536,11 +650,17 @@ const SAME_ORIGIN_HEADER_TESTS = [
   /^\s*\*\s*->\s*Cross-Origin-Opener-Policy\s*:\s*same-origin\s*$/im,
 ];
 
+/** @param {vscode.Uri} uri */
 function isPreviewable(uri) {
   return /\.(html?|svg|pdf|md)$/i.test(uri.path);
 }
 
-/** `rfs:/<Folder>/a/b.html` + base -> `<base>/n/<Folder>/a/b.html` */
+/**
+ * `rfs:/<Folder>/a/b.html` + base -> `<base>/n/<Folder>/a/b.html`
+ *
+ * @param {string} base
+ * @param {vscode.Uri} uri
+ */
 function previewUrlFor(base, uri) {
   const encoded = uri.path
     .split("/")
@@ -550,10 +670,15 @@ function previewUrlFor(base, uri) {
   return `${base}${VIRTUAL_ROOT}${encoded}`;
 }
 
+/** @param {string | undefined} headers */
 function hasSameOriginHeaders(headers) {
   return SAME_ORIGIN_HEADER_TESTS.every((test) => test.test(headers || ""));
 }
 
+/**
+ * @param {string} folder
+ * @param {boolean} enabled
+ */
 async function setSameOriginHeaders(folder, enabled) {
   const registry = await readRegistry();
   const current = registry[folder]?.headers || "";
@@ -567,6 +692,7 @@ async function setSameOriginHeaders(folder, enabled) {
   await invalidateFolderCache(folder);
 }
 
+/** @param {string} folder */
 async function ensureSameOriginHeaders(folder) {
   const headers = (await readRegistry())[folder]?.headers || "";
   if (hasSameOriginHeaders(headers)) {
@@ -591,7 +717,7 @@ async function ensureSameOriginHeaders(folder) {
 }
 
 /**
- * The active editor if it is previewable, else the RuntimeFS workspace root —
+ * The active editor if it is previewable, else the RuntimeFS workspace root,
  * which RuntimeFS resolves to index.html, matching the user's expectation that
  * previewing "the folder" just works.
  */
@@ -610,18 +736,48 @@ function resolvePreviewTarget() {
   return folder ? folder.uri : undefined;
 }
 
+/** @type {Record<string, string>} */
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+
+/** @param {string} value */
 function escapeHtml(value) {
-  return String(value).replace(
-    /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-  );
+  return String(value).replace(/[&<>"]/g, (c) => HTML_ESCAPES[c]);
+}
+
+/**
+ * The rc-preview.html wrapper URL for a target. `cacheBust` makes the iframe
+ * refetch through RuntimeFS's service worker instead of replaying what it
+ * cached before the last save.
+ *
+ * @param {string} runtimeCodeBase
+ * @param {string} target
+ * @param {boolean} inspector
+ * @param {boolean} [cacheBust]
+ */
+function previewWrapperUrl(
+  runtimeCodeBase,
+  target,
+  inspector,
+  cacheBust = false,
+) {
+  const wrapper = new URL("rc-preview.html", runtimeCodeBase);
+  wrapper.searchParams.set("target", target);
+  if (inspector) {
+    wrapper.searchParams.set("inspector", "1");
+  }
+  if (cacheBust) {
+    wrapper.searchParams.set("__rc", String(Date.now()));
+  }
+  return wrapper.toString();
 }
 
 class PreviewPanel {
-  constructor(context) {
-    this._context = context;
+  constructor() {
+    /** @type {vscode.WebviewPanel | undefined} */
     this._panel = undefined;
+    /** @type {string | undefined} */
     this._url = undefined;
+    /** @type {string | undefined} */
     this._runtimeCodeBase = undefined;
     this._inspector = vscode.workspace
       .getConfiguration("runtimecode.preview")
@@ -632,6 +788,16 @@ class PreviewPanel {
     return !!this._panel;
   }
 
+  /** Whether Eruda is injected. Opening in a tab has to match the panel. */
+  get inspector() {
+    return this._inspector;
+  }
+
+  /**
+   * @param {string} url
+   * @param {string} title
+   * @param {string} runtimeCodeBase
+   */
   show(url, title, runtimeCodeBase) {
     this._url = url;
     this._runtimeCodeBase = runtimeCodeBase;
@@ -662,12 +828,16 @@ class PreviewPanel {
       this._panel.reveal(vscode.ViewColumn.Beside, true);
     }
 
-    this._panel.webview.html = this._html(url, title);
+    this._panel.webview.html = this._html(url, title, runtimeCodeBase);
   }
 
   reload() {
-    if (this._panel && this._url) {
-      this._panel.webview.html = this._html(this._url, this._panel.title);
+    if (this._panel && this._url && this._runtimeCodeBase) {
+      this._panel.webview.html = this._html(
+        this._url,
+        this._panel.title,
+        this._runtimeCodeBase,
+      );
     }
   }
 
@@ -680,19 +850,13 @@ class PreviewPanel {
     return this._inspector;
   }
 
-  wrapperUrl() {
-    const wrapper = new URL("rc-preview.html", this._runtimeCodeBase);
-    wrapper.searchParams.set("target", this._url);
-    if (this._inspector) {
-      wrapper.searchParams.set("inspector", "1");
-    }
-    return wrapper.toString();
-  }
-
-  _html(url, title) {
-    // Cache-bust so the iframe refetches through RuntimeFS's service worker
-    // rather than replaying whatever the previous load cached.
-    const src = `${this.wrapperUrl()}${this.wrapperUrl().includes("?") ? "&" : "?"}__rc=${Date.now()}`;
+  /**
+   * @param {string} url
+   * @param {string} title
+   * @param {string} runtimeCodeBase
+   */
+  _html(url, title, runtimeCodeBase) {
+    const src = previewWrapperUrl(runtimeCodeBase, url, this._inspector, true);
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -755,8 +919,10 @@ async function resolvePreviewUrl({ prepare = true } = {}) {
 
   // Only the workbench knows where RuntimeFS is mounted; the extension host is
   // a worker with no `window.location`.
-  const base = await vscode.commands.executeCommand(
-    "runtimecode.internal.getRuntimeFsBase",
+  const base = /** @type {string | undefined} */ (
+    await vscode.commands.executeCommand(
+      "runtimecode.internal.getRuntimeFsBase",
+    )
   );
   if (!base) {
     vscode.window.showErrorMessage(
@@ -766,8 +932,10 @@ async function resolvePreviewUrl({ prepare = true } = {}) {
     return undefined;
   }
 
-  const runtimeCodeBase = await vscode.commands.executeCommand(
-    "runtimecode.internal.getRuntimeCodeBase",
+  const runtimeCodeBase = /** @type {string | undefined} */ (
+    await vscode.commands.executeCommand(
+      "runtimecode.internal.getRuntimeCodeBase",
+    )
   );
   if (!runtimeCodeBase) {
     return undefined;
@@ -787,9 +955,10 @@ async function resolveDevPreview() {
 
 // ---------------------------------------------------------------------------
 
+/** @param {vscode.ExtensionContext} context */
 function activate(context) {
   const provider = new RuntimeFSProvider();
-  const preview = new PreviewPanel(context);
+  const preview = new PreviewPanel();
 
   context.subscriptions.push(
     vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
@@ -834,14 +1003,13 @@ function activate(context) {
         }
         // window.open is unavailable in the extension host worker, so the
         // workbench opens the tab. That also keeps RuntimeFS's rules applied.
-        const wrapper = new URL("rc-preview.html", resolved.runtimeCodeBase);
-        wrapper.searchParams.set("target", resolved.url);
-        if (preview._inspector) {
-          wrapper.searchParams.set("inspector", "1");
-        }
         await vscode.commands.executeCommand(
           "runtimecode.internal.openExternalTab",
-          wrapper.toString(),
+          previewWrapperUrl(
+            resolved.runtimeCodeBase,
+            resolved.url,
+            preview.inspector,
+          ),
         );
       },
     ),

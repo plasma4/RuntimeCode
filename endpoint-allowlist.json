@@ -17,7 +17,7 @@
 				"app/out/vs/sessions/sessions.web.main.internal.js",
 				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
 			],
-			"reason": "Dead fallback in environmentService.ts:239 — `productService.webviewContentExternalBaseUrlTemplate || 'https://{{uuid}}.vscode-cdn.net/...'`. staticify.mjs sets options.webviewEndpoint, which wins at line 237, so the fallback is unreachable. Confirmed by runtime network capture."
+			"reason": "Dead fallback in environmentService.ts:239: `productService.webviewContentExternalBaseUrlTemplate || 'https://{{uuid}}.vscode-cdn.net/...'`. staticify.mjs sets options.webviewEndpoint, which wins at line 237, so the fallback is unreachable. Confirmed by runtime network capture."
 		},
 		{
 			"pattern": "vscode-cdn.net",
@@ -44,7 +44,7 @@
 				"app/out/vs/sessions/sessions.web.main.internal.js",
 				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
 			],
-			"reason": "product.defaultChatAgent entitlement URLs, plus path fragments appended to a user-configured GitHub Enterprise host. defaultChatAgent cannot be removed (onboardingVariationA.ts:80 asserts it at module scope), so these stay as inert config. Nothing reads them because extensions/copilot is not bundled — the entitlement flow only runs from that extension."
+			"reason": "product.defaultChatAgent entitlement URLs, plus path fragments appended to a user-configured GitHub Enterprise host. defaultChatAgent cannot be removed (onboardingVariationA.ts:80 asserts it at module scope), so these stay as inert config. Nothing reads them because extensions/copilot is not bundled, and the entitlement flow only runs from that extension."
 		},
 		{
 			"pattern": "api.github.com/copilot",
@@ -54,7 +54,7 @@
 				"app/out/vs/sessions/sessions.web.main.internal.js",
 				"app/out/vs/workbench/api/worker/extensionHostWorkerMain.js"
 			],
-			"reason": "Same defaultChatAgent entitlement/MCP-registry URLs. Inert without the Copilot extension. If you later install Copilot from the gallery these become live — that is the user's choice to make, which is why they are left configured rather than blanked."
+			"reason": "Same defaultChatAgent entitlement/MCP-registry URLs. Inert without the Copilot extension. They would become live if Copilot were ever installed, which Open VSX cannot currently do: it carries neither GitHub.copilot nor GitHub.copilot-chat. Left configured rather than blanked so that choice stays open."
 		},
 		{
 			"pattern": "marketplace.visualstudio.com",
@@ -90,7 +90,7 @@
 				"app/out/vs/workbench/workbench.web.main.internal.js",
 				"app/out/vs/sessions/sessions.web.main.internal.js"
 			],
-			"reason": "The 1DS collector URL is a module-level constant in platform/telemetry/common/1dsAppender.ts, but the appender is only constructed at telemetryService.ts:112, which requires productService.aiConfig?.ariaKey. The OSS product.json has no aiConfig — that key lives in the private distro mixin — so no appender is ever created and the constant is dead. Confirmed by runtime network capture."
+			"reason": "The 1DS collector URL is a module-level constant in platform/telemetry/common/1dsAppender.ts, but the appender is only constructed at telemetryService.ts:112, which requires productService.aiConfig?.ariaKey. The OSS product.json has no aiConfig, since that key lives in the private distro mixin, so no appender is ever created and the constant is dead. Confirmed by runtime network capture."
 		},
 		{
 			"pattern": "mobile.events.data.microsoft.com",
@@ -117,7 +117,7 @@
 				"app/extensions/merge-conflict/dist/browser/mergeConflictMain.js",
 				"app/extensions/typescript-language-features/dist/browser/extension.js"
 			],
-			"reason": "The ApplicationInsights SDK bundled into Microsoft-authored built-in extensions via @vscode/extension-telemetry. This is real telemetry code, not a doc string — but it gates on vscode.env.isTelemetryEnabled, which is false because configurationDefaults sets telemetry.telemetryLevel to 'off'. Left present rather than stripped so the user retains the choice, per the settings-based approach. Drop these extensions from the bundle if you want the code gone entirely."
+			"reason": "The ApplicationInsights SDK bundled into Microsoft-authored built-in extensions via @vscode/extension-telemetry. This is real telemetry code rather than a doc string, but it gates on vscode.env.isTelemetryEnabled, which is false because configurationDefaults sets telemetry.telemetryLevel to 'off'. Left present rather than stripped so the user retains the choice, per the settings-based approach. Drop these extensions from the bundle if you want the code gone entirely."
 		}
 	]
 }

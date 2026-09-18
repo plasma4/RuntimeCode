@@ -5,7 +5,12 @@ dist/
 # The upstream vscode checkout is an input, not part of this repo. It lives at
 # ../vscode by default, or wherever RUNTIMECODE_VSCODE points.
 
+# vscode.d.ts, copied out of the checkout by scripts/typecheck.mjs so the editor
+# and tsc can resolve require('vscode') without an npm install here.
+extensions/types/
+
 node_modules/
 .serve/
 *.log
 .DS_Store
+/.claude

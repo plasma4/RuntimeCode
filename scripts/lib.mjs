@@ -88,6 +88,66 @@ export function deepMerge(base, overlay) {
 	return out;
 }
 
+/**
+ * Upstream strings that name Microsoft's product in UI this build actually
+ * shows. The Welcome page is the loudest one: without this, a fresh workspace
+ * greets the user with "Get Started with VS Code for the Web".
+ *
+ * Keys, not offsets: out/nls.keys.json is [module, [key, ...]] pairs and
+ * out/nls.messages.json is one flat array in the same order, so a key names a
+ * message for as long as upstream keeps the key.
+ */
+const BRANDED_NLS_KEYS = [
+	'gettingStarted.setupWeb.title',
+	'gettingStarted.setupWeb.walkthroughPageTitle',
+	'gettingStarted.extensionsWeb.description.interpolated',
+	'gettingStarted.commandPalette.description.interpolated',
+	'gettingStarted.settingsAndSync.description.interpolated',
+	'gettingStarted.setup.OpenFolderWeb.description.interpolated',
+	'minWelcomeDescription',
+	'workbench.startupEditor.welcomePage',
+	'onboarding.a.aria',
+	'onboarding.signIn.heroTitle',
+	'onboarding.personalize.tip.suffix'
+];
+
+/** Longest first, so "VS Code for the Web" never leaves a stray "for the Web". */
+const BRAND_NAMES = ['VS Code for the Web', 'Visual Studio Code', 'VS Code Web', 'VS Code'];
+
+/**
+ * Rewrites the branded messages in place and returns the new array. Throws when
+ * a listed key has stopped mentioning the product, because that means upstream
+ * reworded it and the replacement needs looking at rather than skipping.
+ */
+export function rebrandNlsMessages(keys, messages, productName) {
+	const wanted = new Set(BRANDED_NLS_KEYS);
+	const unchanged = new Set(BRANDED_NLS_KEYS);
+	const out = messages.slice();
+
+	let index = 0;
+	for (const [, moduleKeys] of keys) {
+		for (const key of moduleKeys) {
+			const at = index++;
+			if (!wanted.has(key) || typeof out[at] !== 'string') { continue; }
+
+			let message = out[at];
+			for (const name of BRAND_NAMES) { message = message.replaceAll(name, productName); }
+			if (message !== out[at]) {
+				out[at] = message;
+				unchanged.delete(key);
+			}
+		}
+	}
+
+	if (index !== messages.length) {
+		throw new Error(`nls.keys.json describes ${index} messages, nls.messages has ${messages.length}`);
+	}
+	if (unchanged.size) {
+		throw new Error(`These nls keys no longer name the product, so the rebranding missed them: ${[...unchanged].join(', ')}`);
+	}
+	return out;
+}
+
 export function assertVscodeCheckout() {
 	if (!existsSync(path.join(VSCODE_ROOT, 'product.json'))) {
 		throw new Error(

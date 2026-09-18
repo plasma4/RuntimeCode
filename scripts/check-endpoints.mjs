@@ -1,7 +1,7 @@
 /**
  * Build gate: catches Microsoft endpoints reappearing in the output.
  *
- * A plain grep is useless here — the build legitimately contains these strings
+ * A plain grep is useless here, because the build legitimately contains these strings
  * in localized UI text, in TypeScript's diagnostic messages, and as dead
  * fallbacks. So instead of failing on any match, this fails on any match that
  * is not in endpoint-allowlist.json with a written justification. That turns it
@@ -85,16 +85,16 @@ for (const [pattern, count] of [...accountedFor].sort()) {
 }
 
 if (unexplained.length > 0) {
-	console.error(`\n[check-endpoints] FAIL — ${unexplained.length} unexplained match(es):\n`);
+	console.error(`\n[check-endpoints] FAIL: ${unexplained.length} unexplained match(es):\n`);
 	for (const hit of unexplained.slice(0, 30)) {
 		console.error(`  ${hit.file}\n    ${hit.pattern}\n    ...${hit.context}...\n`);
 	}
 	if (unexplained.length > 30) { console.error(`  ...and ${unexplained.length - 30} more`); }
 	console.error(
-		'Either the endpoint is genuinely live (fix it), or it is inert — in which\n' +
+		'Either the endpoint is genuinely live (fix it), or it is inert, in which\n' +
 		'case add it to endpoint-allowlist.json WITH a reason.\n'
 	);
 	process.exit(1);
 }
 
-console.log('[check-endpoints] OK — every match is accounted for');
+console.log('[check-endpoints] OK: every match is accounted for');

@@ -36,7 +36,7 @@ try {
 	console.error(
 		`\n[upgrade] prepare failed on ${tag}. This is usually a patch that no longer applies.\n` +
 		`Fix the conflict by hand in ${VSCODE_ROOT}, then regenerate that patch from\n` +
-		`the working tree — keeping the prose header, which git apply ignores:\n` +
+		`the working tree, keeping the prose header, which git apply ignores:\n` +
 		`  cd ${VSCODE_ROOT}\n` +
 		`  { sed '/^diff --git /q' p.patch | sed '$d'; git diff HEAD -- <paths>; } > p.patch.new\n` +
 		`Never hand-edit a .patch file: a patch whose index lines do not match real\n` +
@@ -46,10 +46,10 @@ try {
 	throw err;
 }
 
-console.log('[upgrade] dependencies move between tags — reinstalling');
+console.log('[upgrade] dependencies move between tags, reinstalling');
 run('npm', ['ci'], { cwd: VSCODE_ROOT });
 
 // A tag bump invalidates the incremental compile cache.
 run('node', [path.join(RC_ROOT, 'scripts', 'build.mjs'), '--full', ...buildArgs]);
 
-console.log(`[upgrade] done — now on ${tag}`);
+console.log(`[upgrade] done: now on ${tag}`);

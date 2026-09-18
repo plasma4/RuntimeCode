@@ -34,8 +34,10 @@
 		"",
 		"Copilot is instead disabled the way the user asked for: the extension is",
 		"not bundled, so none of these endpoints are ever contacted, and the URLs",
-		"remain inert config. This also leaves the door open to installing Copilot",
-		"from the gallery later rather than making that choice for the user.",
+		"remain inert config. staticify.mjs defaults chat.disableAIFeatures to true",
+		"so the chat status bar entry does not advertise a product this build has no",
+		"way to install: Open VSX carries neither GitHub.copilot nor",
+		"GitHub.copilot-chat. Both halves are reversible by configuration.",
 		"See endpoint-allowlist.json for the per-endpoint justification."
 	],
 	"voiceWsUrl": null,

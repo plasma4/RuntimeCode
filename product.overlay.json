@@ -7,25 +7,21 @@
 		"Likewise updateUrl / nlsCoreBaseUrl / experimentsUrl / tasConfig are absent",
 		"upstream and must simply not be reintroduced."
 	],
-
 	"nameShort": "RuntimeCode",
 	"nameLong": "RuntimeCode",
 	"applicationName": "runtimecode",
 	"dataFolderName": ".runtimecode",
 	"urlProtocol": "runtimecode",
-
 	"licenseName": "MIT",
 	"licenseUrl": "https://github.com/plasma4/runtimecode/blob/main/LICENSE",
 	"serverLicenseUrl": "https://github.com/plasma4/runtimecode/blob/main/LICENSE",
 	"reportIssueUrl": "https://github.com/plasma4/runtimecode/issues/new",
-
 	"_comment_webview": [
 		"MUST be removed: left in place, environmentService.ts resolves webviews to",
 		"vscode-cdn.net and every webview breaks offline. staticify.mjs supplies a",
 		"same-origin webviewEndpoint instead."
 	],
 	"webviewContentExternalBaseUrlTemplate": null,
-
 	"_comment_copilot": [
 		"defaultChatAgent is deliberately LEFT INTACT. Removing it breaks startup:",
 		"welcomeOnboarding/browser/onboardingVariationA.ts:80 does",
@@ -41,7 +37,6 @@
 		"See endpoint-allowlist.json for the per-endpoint justification."
 	],
 	"voiceWsUrl": null,
-
 	"_comment_gallery": "Open VSX, as VSCodium does. No Microsoft endpoints.",
 	"extensionsGallery": {
 		"serviceUrl": "https://open-vsx.org/vscode/gallery",

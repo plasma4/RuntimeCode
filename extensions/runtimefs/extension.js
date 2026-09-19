@@ -409,6 +409,21 @@ class RuntimeFSProvider {
   }
 
   /**
+   * A presence probe. Anything stat() throws for a path that is not there is
+   * FileNotFound; a genuine failure resurfaces on the operation that follows.
+   *
+   * @param {vscode.Uri} uri
+   * @returns {Promise<vscode.FileStat | undefined>}
+   */
+  async _statOrUndefined(uri) {
+    try {
+      return await this.stat(uri);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * @param {vscode.Uri} oldUri
    * @param {vscode.Uri} newUri
    * @param {{ overwrite: boolean }} options
@@ -417,14 +432,27 @@ class RuntimeFSProvider {
     // OPFS has no atomic move, so this is copy-then-delete.
     const { folder } = parseUri(oldUri);
     try {
+      // The destination is settled here rather than inside the copy, because
+      // getDirectoryHandle({ create: true }) succeeds on a directory that
+      // already exists. Left to _copyDirectory, an overwriting rename merged the
+      // two trees and a non-overwriting one did not fail at all. Files went
+      // through writeFile and were always checked, so only directories were
+      // wrong.
+      const overwrite = !!(options && options.overwrite);
+      if (await this._statOrUndefined(newUri)) {
+        if (!overwrite) {
+          throw vscode.FileSystemError.FileExists(newUri);
+        }
+        await this.delete(newUri, { recursive: true });
+      }
+
       const stat = await this.stat(oldUri);
       if (stat.type === vscode.FileType.Directory) {
-        await this._copyDirectory(oldUri, newUri, options);
+        await this._copyDirectory(oldUri, newUri);
       } else {
-        const data = await this.readFile(oldUri);
-        await this.writeFile(newUri, data, {
+        await this.writeFile(newUri, await this.readFile(oldUri), {
           create: true,
-          overwrite: !!(options && options.overwrite),
+          overwrite: true,
         });
       }
       await this.delete(oldUri, { recursive: true });
@@ -440,21 +468,23 @@ class RuntimeFSProvider {
   }
 
   /**
+   * Copies into a destination the caller has already cleared, so every write
+   * here may overwrite.
+   *
    * @param {vscode.Uri} from
    * @param {vscode.Uri} to
-   * @param {{ overwrite: boolean }} options
    */
-  async _copyDirectory(from, to, options) {
+  async _copyDirectory(from, to) {
     await this.createDirectory(to);
     for (const [name, type] of await this.readDirectory(from)) {
       const childFrom = from.with({ path: `${from.path}/${name}` });
       const childTo = to.with({ path: `${to.path}/${name}` });
       if (type === vscode.FileType.Directory) {
-        await this._copyDirectory(childFrom, childTo, options);
+        await this._copyDirectory(childFrom, childTo);
       } else {
         await this.writeFile(childTo, await this.readFile(childFrom), {
           create: true,
-          overwrite: !!(options && options.overwrite),
+          overwrite: true,
         });
       }
     }
@@ -509,69 +539,164 @@ function folderUri(name) {
   return vscode.Uri.from({ scheme: SCHEME, path: `/${name}` });
 }
 
-async function openRfsFolder() {
-  const folders = await listFolders();
-  if (folders.length === 0) {
-    const create = "Create Folder...";
-    const choice = await vscode.window.showInformationMessage(
-      "No RuntimeFS folders yet. Upload one in RuntimeFS, or create an empty one here.",
-      create,
-    );
-    if (choice === create) {
-      return newRfsFolder();
-    }
-    return;
+/**
+ * Why `name` cannot be a folder, or undefined if it can. Shared by the picker
+ * and the input box so the two cannot disagree about what a name may be.
+ *
+ * @param {string} name
+ * @param {string[]} existing
+ * @returns {string | undefined}
+ */
+function folderNameProblem(name, existing) {
+  if (!name) {
+    return "A name is required.";
   }
-
-  const picked = await vscode.window.showQuickPick(folders, {
-    title: "Open RuntimeFS Folder",
-    placeHolder: "Select a folder stored in RuntimeFS",
-  });
-  if (picked) {
-    await vscode.commands.executeCommand(
-      "vscode.openFolder",
-      folderUri(picked),
-    );
+  if (/[/\\]/.test(name)) {
+    return "The name cannot contain slashes.";
   }
+  if (existing.includes(name)) {
+    return "A folder with that name already exists.";
+  }
+  return undefined;
 }
 
-async function newRfsFolder() {
-  const existing = new Set(await listFolders());
-  const name = await vscode.window.showInputBox({
-    title: "New RuntimeFS Folder",
-    prompt: "Name for the new folder",
-    validateInput: (value) => {
-      if (!value || !value.trim()) {
-        return "A name is required.";
-      }
-      if (/[/\\]/.test(value)) {
-        return "The name cannot contain slashes.";
-      }
-      if (existing.has(value)) {
-        return "A folder with that name already exists.";
-      }
-      return undefined;
-    },
-  });
-  if (!name) {
-    return;
-  }
-
+/** @param {string} name */
+async function createFolder(name) {
   const root = await rfsRoot(true);
   await root.getDirectoryHandle(name, { create: true });
   // encryptionType mirrors what rfs.js writes for a plain imported folder.
   await updateRegistryEntry(name, { encryptionType: null });
-
   await vscode.commands.executeCommand("vscode.openFolder", folderUri(name));
 }
 
-/** Imports a native directory through Chromium's File System Access picker. */
+const NEW_FOLDER_ITEM = "$(new-folder) New RuntimeFS Folder...";
+
+/**
+ * The folder list, with creating one pinned to the top the way the Git branch
+ * picker and the profile picker do it. Typing a name that is not on the list
+ * turns that entry into Create "<name>", so the answer to "none of these" is in
+ * front of the user instead of behind a second command they have to know about.
+ *
+ * showQuickPick cannot do this: it resolves to an item, and the text typed to
+ * filter with is thrown away. createQuickPick keeps it in `value`.
+ *
+ * @param {string[]} folders
+ * @returns {Promise<{ open: string } | { create: string | undefined } | undefined>}
+ */
+function pickRfsFolder(folders) {
+  return new Promise((resolve) => {
+    const picker = vscode.window.createQuickPick();
+    picker.title = "Open RuntimeFS Folder";
+    picker.placeholder = folders.length
+      ? "Select a folder stored in RuntimeFS, or type a name to create one"
+      : "No RuntimeFS folders yet. Type a name to create one, or upload one in RuntimeFS.";
+
+    // alwaysShow, or the filter hides it the moment the name is new.
+    /** @type {vscode.QuickPickItem} */
+    const create = { label: NEW_FOLDER_ITEM, alwaysShow: true };
+    const folderItems = folders.map((label) => ({ label }));
+    const separator = {
+      label: "",
+      kind: vscode.QuickPickItemKind.Separator,
+    };
+
+    const refresh = () => {
+      const name = picker.value.trim();
+      const isNew = name && !folders.includes(name);
+      create.label = isNew ? `$(new-folder) Create "${name}"` : NEW_FOLDER_ITEM;
+      // The reason shows under the entry rather than as a notification, and
+      // accepting it does nothing, which is how a validated input box behaves.
+      create.detail = isNew ? folderNameProblem(name, folders) : undefined;
+      picker.items = folders.length
+        ? [create, separator, ...folderItems]
+        : [create];
+    };
+
+    /** @type {{ open: string } | { create: string | undefined } | undefined} */
+    let result;
+    refresh();
+
+    picker.onDidChangeValue(refresh);
+
+    picker.onDidAccept(() => {
+      const [selected] = picker.selectedItems;
+      if (!selected) {
+        return;
+      }
+      if (selected !== create) {
+        result = { open: selected.label };
+        picker.hide();
+        return;
+      }
+      const name = picker.value.trim();
+      if (name && folderNameProblem(name, folders)) {
+        return; // create.detail already says why
+      }
+      // Nothing typed means "New RuntimeFS Folder...", which opens the input box.
+      result = { create: name || undefined };
+      picker.hide();
+    });
+
+    // hide() fires this, so the result is handed over here rather than at the
+    // accept site. Resolving there would race the undefined this one resolves.
+    picker.onDidHide(() => {
+      picker.dispose();
+      resolve(result);
+    });
+
+    picker.show();
+  });
+}
+
+async function openRfsFolder() {
+  const choice = await pickRfsFolder(await listFolders());
+  if (!choice) {
+    return;
+  }
+  if ("open" in choice) {
+    await vscode.commands.executeCommand(
+      "vscode.openFolder",
+      folderUri(choice.open),
+    );
+    return;
+  }
+  await (choice.create ? createFolder(choice.create) : newRfsFolder());
+}
+
+/** @param {string} [initial] a name the picker already collected */
+async function newRfsFolder(initial) {
+  const existing = await listFolders();
+  const name = await vscode.window.showInputBox({
+    title: "New RuntimeFS Folder",
+    prompt: "Name for the new folder",
+    value: initial,
+    validateInput: (value) => folderNameProblem(value.trim(), existing),
+  });
+  if (!name || !name.trim()) {
+    return;
+  }
+  await createFolder(name.trim());
+}
+
+/**
+ * Imports a native directory through Chromium's File System Access picker.
+ *
+ * The bootstrap does the copying, because the picker and the directory handle it
+ * returns only exist in the window. Registering the result stays here, so
+ * updateRegistryEntry above remains the only code in RuntimeCode that writes
+ * rfs_system.json. The folder is on disk for the moment between the two, which
+ * RuntimeFS tolerates: it repairs the registry from the directory listing, the
+ * same drift listFolders() already accounts for.
+ */
 async function importRfsFolder() {
   try {
     const name = await vscode.commands.executeCommand(
       "runtimecode.internal.importRfsFolder",
     );
     if (typeof name === "string" && name) {
+      // encryptionType mirrors what rfs.js writes for a plain imported folder.
+      await updateRegistryEntry(name, { encryptionType: null });
+      await invalidateFolderCache(name);
       await vscode.commands.executeCommand(
         "vscode.openFolder",
         folderUri(name),
@@ -676,6 +801,18 @@ function hasSameOriginHeaders(headers) {
 }
 
 /**
+ * What was last written per folder. Updating `runtimecode.sameOrigin.enabled`
+ * fires onDidChangeConfiguration, so without this the extension's own settings
+ * write comes straight back and rewrites the registry a second time. Comparing
+ * values rather than setting a flag avoids guessing when that event arrives: a
+ * change the user makes in the Settings editor differs from what was applied and
+ * is still honoured.
+ *
+ * @type {Map<string, boolean>}
+ */
+const appliedSameOrigin = new Map();
+
+/**
  * @param {string} folder
  * @param {boolean} enabled
  */
@@ -689,7 +826,22 @@ async function setSameOriginHeaders(folder, enabled) {
     lines.push(...SAME_ORIGIN_HEADER_LINES);
   }
   await updateRegistryEntry(folder, { headers: lines.join("\n").trim() });
+  appliedSameOrigin.set(folder, enabled);
   await invalidateFolderCache(folder);
+}
+
+/**
+ * Writes the headers and records the choice in settings, which is what keeps
+ * them in place for the next session.
+ *
+ * @param {string} folder
+ * @param {boolean} enabled
+ */
+async function applySameOrigin(folder, enabled) {
+  await setSameOriginHeaders(folder, enabled);
+  await vscode.workspace
+    .getConfiguration("runtimecode.sameOrigin")
+    .update("enabled", enabled, vscode.ConfigurationTarget.Global);
 }
 
 /** @param {string} folder */
@@ -706,10 +858,7 @@ async function ensureSameOriginHeaders(folder) {
   if (choice !== add) {
     return false;
   }
-  await setSameOriginHeaders(folder, true);
-  await vscode.workspace
-    .getConfiguration("runtimecode.sameOrigin")
-    .update("enabled", true, vscode.ConfigurationTarget.Global);
+  await applySameOrigin(folder, true);
   vscode.window.showInformationMessage(
     "Dev Preview same-origin headers added; cache refreshed.",
   );
@@ -771,6 +920,12 @@ function previewWrapperUrl(
   return wrapper.toString();
 }
 
+function readInspectorSetting() {
+  return vscode.workspace
+    .getConfiguration("runtimecode.preview")
+    .get("inspector", false);
+}
+
 class PreviewPanel {
   constructor() {
     /** @type {vscode.WebviewPanel | undefined} */
@@ -779,9 +934,7 @@ class PreviewPanel {
     this._url = undefined;
     /** @type {string | undefined} */
     this._runtimeCodeBase = undefined;
-    this._inspector = vscode.workspace
-      .getConfiguration("runtimecode.preview")
-      .get("inspector", false);
+    this._inspector = readInspectorSetting();
   }
 
   get isOpen() {
@@ -848,6 +1001,21 @@ class PreviewPanel {
       .update("inspector", this._inspector, vscode.ConfigurationTarget.Global);
     this.reload();
     return this._inspector;
+  }
+
+  /**
+   * Re-reads the setting so a change made in the Settings editor, rather than
+   * through the command or the toolbar button, reaches an open preview. The
+   * equality check also swallows the echo from toggleInspector's own update,
+   * which would otherwise reload the panel twice.
+   */
+  syncInspector() {
+    const enabled = readInspectorSetting();
+    if (enabled === this._inspector) {
+      return;
+    }
+    this._inspector = enabled;
+    this.reload();
   }
 
   /**
@@ -926,7 +1094,8 @@ async function resolvePreviewUrl({ prepare = true } = {}) {
   );
   if (!base) {
     vscode.window.showErrorMessage(
-      "Live preview needs RuntimeCode to be served from RuntimeFS (a /n/<Folder>/ URL). " +
+      "Live preview needs RuntimeFS. Serve RuntimeCode from a /n/<Folder>/ URL, " +
+        "or from a path inside the directory RuntimeFS is installed in. " +
         "This instance looks like it is hosted standalone.",
     );
     return undefined;
@@ -1050,11 +1219,7 @@ function activate(context) {
         if (!target) {
           return;
         }
-        const folder = parseUri(target).folder;
-        await setSameOriginHeaders(folder, true);
-        await vscode.workspace
-          .getConfiguration("runtimecode.sameOrigin")
-          .update("enabled", true, vscode.ConfigurationTarget.Global);
+        await applySameOrigin(parseUri(target).folder, true);
         vscode.window.showInformationMessage(
           "Dev Preview same-origin headers enabled; cache refreshed.",
         );
@@ -1068,11 +1233,7 @@ function activate(context) {
         if (!target) {
           return;
         }
-        const folder = parseUri(target).folder;
-        await setSameOriginHeaders(folder, false);
-        await vscode.workspace
-          .getConfiguration("runtimecode.sameOrigin")
-          .update("enabled", false, vscode.ConfigurationTarget.Global);
+        await applySameOrigin(parseUri(target).folder, false);
         vscode.window.showInformationMessage(
           "Dev Preview same-origin headers disabled; cache refreshed.",
         );
@@ -1080,17 +1241,27 @@ function activate(context) {
     ),
 
     vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (event.affectsConfiguration("runtimecode.preview.inspector")) {
+        preview.syncInspector();
+      }
       if (!event.affectsConfiguration("runtimecode.sameOrigin.enabled")) {
         return;
       }
+      // The folder is resolved here rather than remembered, so the setting
+      // always applies to whatever is open now. A user who switches folders and
+      // then flips the setting means the folder in front of them.
       const target = resolvePreviewTarget();
       if (!target) {
         return;
       }
+      const folder = parseUri(target).folder;
       const enabled = vscode.workspace
         .getConfiguration("runtimecode.sameOrigin")
         .get("enabled", false);
-      await setSameOriginHeaders(parseUri(target).folder, enabled);
+      if (appliedSameOrigin.get(folder) === enabled) {
+        return;
+      }
+      await setSameOriginHeaders(folder, enabled);
     }),
 
     // Saving anything in a previewed folder refreshes the side preview.

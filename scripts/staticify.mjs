@@ -15,12 +15,30 @@
  *
  * This runs entirely on the build output, so it costs no patch against upstream.
  */
-import { cpSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import path from 'node:path';
-import { deepMerge, rebrandNlsMessages, VSCODE_ROOT, GULP_OUT, APP_OUT, HOST_OUT, DIST, RC_ROOT } from './lib.mjs';
+import {
+  cpSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { createHash } from "node:crypto";
+import path from "node:path";
+import {
+  deepMerge,
+  rebrandNlsMessages,
+  VSCODE_ROOT,
+  GULP_OUT,
+  APP_OUT,
+  HOST_OUT,
+  DIST,
+  RC_ROOT,
+} from "./lib.mjs";
 
-const WEBVIEW_SW_NAME = 'rc-webview-sw.js';
+const WEBVIEW_SW_NAME = "rc-webview-sw.js";
 
 const HOST_ROOT_README = `These files must sit at the RuntimeFS HOST ROOT, beside RuntimeFS's own
 index.html and sw.js. Not inside the RuntimeCode folder.
@@ -36,22 +54,27 @@ every webview (markdown preview, notebooks, settings UI) fails to load.
 
 Verify a deployment with:  node scripts/check-deploy.mjs <url-of-runtimecode>
 `;
-const ERUDA_URL = 'https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.js';
-const ERUDA_SHA256 = '332f95b14b1dc53cdbe6042e0ea95ac6025ac691c285d51b647c64360fe939e2';
+const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.js";
+const ERUDA_SHA256 =
+  "332f95b14b1dc53cdbe6042e0ea95ac6025ac691c285d51b647c64360fe939e2";
 
 /** Matches asJSON in webClientServer.ts:361. The config lands in an HTML attribute. */
 function asJSON(value) {
-	return JSON.stringify(value).replace(/"/g, '&quot;');
+  return JSON.stringify(value).replace(/"/g, "&quot;");
 }
 
 function buildProductConfiguration() {
-	const product = JSON.parse(readFileSync(path.join(VSCODE_ROOT, 'product.json'), 'utf8'));
-	const overlay = JSON.parse(readFileSync(path.join(RC_ROOT, 'product.overlay.json'), 'utf8'));
-	const merged = deepMerge(product, overlay);
+  const product = JSON.parse(
+    readFileSync(path.join(VSCODE_ROOT, "product.json"), "utf8"),
+  );
+  const overlay = JSON.parse(
+    readFileSync(path.join(RC_ROOT, "product.overlay.json"), "utf8"),
+  );
+  const merged = deepMerge(product, overlay);
 
-	// Mirrors webClientServer.ts:397 so telemetry-related code can tell how it was embedded.
-	merged.embedderIdentifier = 'runtimecode-static';
-	return merged;
+  // Mirrors webClientServer.ts:397 so telemetry-related code can tell how it was embedded.
+  merged.embedderIdentifier = "runtimecode-static";
+  return merged;
 }
 
 /**
@@ -60,55 +83,55 @@ function buildProductConfiguration() {
  * these make the intent explicit and switch off the remaining network chatter.
  */
 const configurationDefaults = {
-	// A default, not a lock. The user can change it in Settings like any other.
-	// `Dark 2026` is the theme id contributed by extensions/theme-defaults.
-	'workbench.colorTheme': 'Dark 2026',
+  // A default, not a lock. The user can change it in Settings like any other.
+  // `Dark 2026` is the theme id contributed by extensions/theme-defaults.
+  "workbench.colorTheme": "Dark 2026",
 
-	// Copilot is not bundled and cannot be installed here: Open VSX has no
-	// GitHub.copilot or GitHub.copilot-chat, so the built-in setup flow would ask
-	// the gallery for an extension that is not in it. Leaving the chat UI visible
-	// therefore only offers a status bar entry and a sign-in that go nowhere.
-	// `sentiment.hidden` follows this setting (chatEntitlementService.ts:1507),
-	// which removes the entry. It stays a default, not a lock: point
-	// extensionsGallery at a registry that carries Copilot, set this to false,
-	// and the whole UI comes back.
-	'chat.disableAIFeatures': true,
+  // Copilot is not bundled and cannot be installed here: Open VSX has no
+  // GitHub.copilot or GitHub.copilot-chat, so the built-in setup flow would ask
+  // the gallery for an extension that is not in it. Leaving the chat UI visible
+  // therefore only offers a status bar entry and a sign-in that go nowhere.
+  // `sentiment.hidden` follows this setting (chatEntitlementService.ts:1507),
+  // which removes the entry. It stays a default, not a lock: point
+  // extensionsGallery at a registry that carries Copilot, set this to false,
+  // and the whole UI comes back.
+  "chat.disableAIFeatures": true,
 
-	'telemetry.telemetryLevel': 'off',
-	'telemetry.feedback.enabled': false,
-	'update.mode': 'none',
-	'update.showReleaseNotes': false,
-	'extensions.autoUpdate': false,
-	'extensions.autoCheckUpdates': false,
-	'workbench.enableExperiments': false,
-	'workbench.settings.enableNaturalLanguageSearch': false,
-	'npm.fetchOnlinePackageInfo': false,
-	'git.autofetch': false
+  "telemetry.telemetryLevel": "off",
+  "telemetry.feedback.enabled": false,
+  "update.mode": "none",
+  "update.showReleaseNotes": false,
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  "workbench.enableExperiments": false,
+  "workbench.settings.enableNaturalLanguageSearch": false,
+  "npm.fetchOnlinePackageInfo": false,
+  "git.autofetch": false,
 };
 
 function buildWorkbenchConfiguration() {
-	return {
-		// Deliberately absent vs. webClientServer.ts:416, because there is no
-		// server: no remoteAuthority, connectionToken, callbackRoute or
-		// serverBasePath.
+  return {
+    // Deliberately absent vs. webClientServer.ts:416, because there is no
+    // server: no remoteAuthority, connectionToken, callbackRoute or
+    // serverBasePath.
 
-		productConfiguration: buildProductConfiguration(),
+    productConfiguration: buildProductConfiguration(),
 
-		// NOTE: webviewEndpoint is intentionally NOT set here. It must be an
-		// ABSOLUTE url: webviewElement.ts:585 does URI.parse(endpoint) and compares
-		// scheme://authority against the origin of incoming webview messages. A
-		// relative endpoint parses to "://" , so every webview message is silently
-		// dropped and webviews never initialise. static/index.html computes the
-		// absolute value from window.location so the folder still works at any path.
+    // NOTE: webviewEndpoint is intentionally NOT set here. It must be an
+    // ABSOLUTE url: webviewElement.ts:585 does URI.parse(endpoint) and compares
+    // scheme://authority against the origin of incoming webview messages. A
+    // relative endpoint parses to "://" , so every webview message is silently
+    // dropped and webviews never initialise. static/index.html computes the
+    // absolute value from window.location so the folder still works at any path.
 
-		configurationDefaults,
+    configurationDefaults,
 
-		// Paints dark before settings resolve, so first load does not flash white
-		// on its way to the configured theme.
-		initialColorTheme: { themeType: 'dark' },
+    // Paints dark before settings resolve, so first load does not flash white
+    // on its way to the configured theme.
+    initialColorTheme: { themeType: "dark" },
 
-		enableWorkspaceTrust: true
-	};
+    enableWorkspaceTrust: true,
+  };
 }
 
 /**
@@ -120,28 +143,46 @@ function buildWorkbenchConfiguration() {
  * so it cannot recur.
  */
 function repairWebviewCspHash() {
-	const file = path.join(APP_OUT, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre', 'index.html');
-	if (!existsSync(file)) {
-		console.warn('[staticify] WARNING: webview host page missing, cannot verify CSP hash');
-		return;
-	}
+  const file = path.join(
+    APP_OUT,
+    "out",
+    "vs",
+    "workbench",
+    "contrib",
+    "webview",
+    "browser",
+    "pre",
+    "index.html",
+  );
+  if (!existsSync(file)) {
+    console.warn(
+      "[staticify] WARNING: webview host page missing, cannot verify CSP hash",
+    );
+    return;
+  }
 
-	const html = readFileSync(file, 'utf8');
-	const script = html.match(/<script[^>]*type="module"[^>]*>([\s\S]*?)<\/script>/);
-	const csp = html.match(/'sha256-([A-Za-z0-9+/=]+)'/);
-	if (!script || !csp) {
-		console.warn('[staticify] WARNING: could not locate webview inline script or CSP hash');
-		return;
-	}
+  const html = readFileSync(file, "utf8");
+  const script = html.match(
+    /<script[^>]*type="module"[^>]*>([\s\S]*?)<\/script>/,
+  );
+  const csp = html.match(/'sha256-([A-Za-z0-9+/=]+)'/);
+  if (!script || !csp) {
+    console.warn(
+      "[staticify] WARNING: could not locate webview inline script or CSP hash",
+    );
+    return;
+  }
 
-	const actual = createHash('sha256').update(script[1], 'utf8').digest('base64');
-	if (actual === csp[1]) {
-		console.log('[staticify] webview CSP hash already correct');
-		return;
-	}
+  const actual = createHash("sha256")
+    .update(script[1], "utf8")
+    .digest("base64");
+  if (actual === csp[1]) {
+    console.log("[staticify] webview CSP hash already correct");
+    return;
+  }
 
-	writeFileSync(file, html.replace(`'sha256-${csp[1]}'`, `'sha256-${actual}'`));
-	console.log(`[staticify] repaired webview CSP hash -> sha256-${actual}`);
+  writeFileSync(file, html.replace(`'sha256-${csp[1]}'`, `'sha256-${actual}'`));
+  console.log(`[staticify] repaired webview CSP hash -> sha256-${actual}`);
 }
 
 /**
@@ -151,41 +192,54 @@ function repairWebviewCspHash() {
  * nothing downstream reads a stale copy.
  */
 function rebrandWelcomeStrings(productName) {
-	const out = path.join(APP_OUT, 'out');
-	const keys = JSON.parse(readFileSync(path.join(out, 'nls.keys.json'), 'utf8'));
-	const messages = rebrandNlsMessages(
-		keys,
-		JSON.parse(readFileSync(path.join(out, 'nls.messages.json'), 'utf8')),
-		productName
-	);
+  const out = path.join(APP_OUT, "out");
+  const keys = JSON.parse(
+    readFileSync(path.join(out, "nls.keys.json"), "utf8"),
+  );
+  const messages = rebrandNlsMessages(
+    keys,
+    JSON.parse(readFileSync(path.join(out, "nls.messages.json"), "utf8")),
+    productName,
+  );
 
-	writeFileSync(path.join(out, 'nls.messages.json'), JSON.stringify(messages));
+  writeFileSync(path.join(out, "nls.messages.json"), JSON.stringify(messages));
 
-	const scriptPath = path.join(out, 'nls.messages.js');
-	const script = readFileSync(scriptPath, 'utf8');
-	const marker = 'globalThis._VSCODE_NLS_MESSAGES=';
-	const at = script.indexOf(marker);
-	if (at === -1) {
-		throw new Error(`No ${marker} in nls.messages.js; the workbench would start unbranded.`);
-	}
-	writeFileSync(scriptPath, `${script.slice(0, at + marker.length)}${JSON.stringify(messages)};\n`);
-	console.log(`[staticify] rebranded built-in welcome strings to ${productName}`);
+  const scriptPath = path.join(out, "nls.messages.js");
+  const script = readFileSync(scriptPath, "utf8");
+  const marker = "globalThis._VSCODE_NLS_MESSAGES=";
+  const at = script.indexOf(marker);
+  if (at === -1) {
+    throw new Error(
+      `No ${marker} in nls.messages.js; the workbench would start unbranded.`,
+    );
+  }
+  writeFileSync(
+    scriptPath,
+    `${script.slice(0, at + marker.length)}${JSON.stringify(messages)};\n`,
+  );
+  console.log(
+    `[staticify] rebranded built-in welcome strings to ${productName}`,
+  );
 }
 
 async function vendorEruda() {
-	const response = await fetch(ERUDA_URL);
-	if (!response.ok) {
-		throw new Error(`Could not download Eruda (${response.status} ${response.statusText}).`);
-	}
-	const body = Buffer.from(await response.arrayBuffer());
-	const digest = createHash('sha256').update(body).digest('hex');
-	if (digest !== ERUDA_SHA256) {
-		throw new Error(`Eruda checksum mismatch: expected ${ERUDA_SHA256}, got ${digest}.`);
-	}
-	const target = path.join(APP_OUT, 'rc-assets', 'eruda.js');
-	mkdirSync(path.dirname(target), { recursive: true });
-	writeFileSync(target, body, { flag: 'w' });
-	console.log('[staticify] vendored Eruda 3.4.3 for opt-in preview inspection');
+  const response = await fetch(ERUDA_URL);
+  if (!response.ok) {
+    throw new Error(
+      `Could not download Eruda (${response.status} ${response.statusText}).`,
+    );
+  }
+  const body = Buffer.from(await response.arrayBuffer());
+  const digest = createHash("sha256").update(body).digest("hex");
+  if (digest !== ERUDA_SHA256) {
+    throw new Error(
+      `Eruda checksum mismatch: expected ${ERUDA_SHA256}, got ${digest}.`,
+    );
+  }
+  const target = path.join(APP_OUT, "rc-assets", "eruda.js");
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, body, { flag: "w" });
+  console.log("[staticify] vendored Eruda 3.4.3 for opt-in preview inspection");
 }
 
 /**
@@ -195,91 +249,124 @@ async function vendorEruda() {
  * instant on the same filesystem and falls back to copy when it is not.
  */
 function collectGulpOutput() {
-	rmSync(DIST, { recursive: true, force: true });
-	mkdirSync(DIST, { recursive: true });
-	try {
-		renameSync(GULP_OUT, APP_OUT);
-	} catch (error) {
-		if (error.code !== 'EXDEV') { throw error; }
-		cpSync(GULP_OUT, APP_OUT, { recursive: true });
-		rmSync(GULP_OUT, { recursive: true, force: true });
-	}
-	mkdirSync(HOST_OUT, { recursive: true });
+  rmSync(DIST, { recursive: true, force: true });
+  mkdirSync(DIST, { recursive: true });
+  try {
+    renameSync(GULP_OUT, APP_OUT);
+  } catch (error) {
+    if (error.code !== "EXDEV") {
+      throw error;
+    }
+    cpSync(GULP_OUT, APP_OUT, { recursive: true });
+    rmSync(GULP_OUT, { recursive: true, force: true });
+  }
+  mkdirSync(HOST_OUT, { recursive: true });
 }
 
 async function main() {
-	if (!existsSync(GULP_OUT)) {
-		throw new Error(`No build output at ${GULP_OUT}. Run scripts/build.mjs first.`);
-	}
+  if (!existsSync(GULP_OUT)) {
+    throw new Error(
+      `No build output at ${GULP_OUT}. Run scripts/build.mjs first.`,
+    );
+  }
 
-	collectGulpOutput();
+  collectGulpOutput();
 
-	// We ship our own bootstrap rather than substituting upstream's
-	// workbench.html. That file loads vs/code/browser/workbench/workbench.js,
-	// the "browser shell", which the `web` build target deliberately does not
-	// emit. See build/next/index.ts:181-186 ("web workbench only (no browser
-	// shell)"); only server-web builds it. The vscode-web bundle is designed to
-	// be driven by an embedder calling create() directly, so static/index.html
-	// does that.
-	const templatePath = path.join(RC_ROOT, 'static', 'index.html');
-	let html = readFileSync(templatePath, 'utf8');
+  // We ship our own bootstrap rather than substituting upstream's
+  // workbench.html. That file loads vs/code/browser/workbench/workbench.js,
+  // the "browser shell", which the `web` build target deliberately does not
+  // emit. See build/next/index.ts:181-186 ("web workbench only (no browser
+  // shell)"); only server-web builds it. The vscode-web bundle is designed to
+  // be driven by an embedder calling create() directly, so static/index.html
+  // does that.
+  const templatePath = path.join(RC_ROOT, "static", "index.html");
+  let html = readFileSync(templatePath, "utf8");
 
-	const values = {
-		WORKBENCH_WEB_CONFIGURATION: asJSON(buildWorkbenchConfiguration())
-	};
+  const values = {
+    WORKBENCH_WEB_CONFIGURATION: asJSON(buildWorkbenchConfiguration()),
+  };
 
-	for (const [key, value] of Object.entries(values)) {
-		html = html.replaceAll(`{{${key}}}`, value);
-	}
+  for (const [key, value] of Object.entries(values)) {
+    html = html.replaceAll(`{{${key}}}`, value);
+  }
 
-	const leftover = html.match(/\{\{[A-Z_]+\}\}/g);
-	if (leftover) {
-		throw new Error(`Unsubstituted placeholders remain: ${[...new Set(leftover)].join(', ')}`);
-	}
+  const leftover = html.match(/\{\{[A-Z_]+\}\}/g);
+  if (leftover) {
+    throw new Error(
+      `Unsubstituted placeholders remain: ${[...new Set(leftover)].join(", ")}`,
+    );
+  }
 
-	writeFileSync(path.join(APP_OUT, 'index.html'), html);
-	copyFileSync(path.join(RC_ROOT, 'static', 'rc-preview.html'), path.join(APP_OUT, 'rc-preview.html'));
+  writeFileSync(path.join(APP_OUT, "index.html"), html);
+  copyFileSync(
+    path.join(RC_ROOT, "static", "rc-preview.html"),
+    path.join(APP_OUT, "rc-preview.html"),
+  );
 
-	// Sanity-check the bundle the bootstrap depends on, so a target change
-	// upstream surfaces here rather than as a blank page in the browser.
-	const webMain = path.join(APP_OUT, 'out', 'vs', 'workbench', 'workbench.web.main.internal.js');
-	if (!existsSync(webMain)) {
-		throw new Error(`Missing ${path.relative(APP_OUT, webMain)}: the web entry point did not build.`);
-	}
+  // Sanity-check the bundle the bootstrap depends on, so a target change
+  // upstream surfaces here rather than as a blank page in the browser.
+  const webMain = path.join(
+    APP_OUT,
+    "out",
+    "vs",
+    "workbench",
+    "workbench.web.main.internal.js",
+  );
+  if (!existsSync(webMain)) {
+    throw new Error(
+      `Missing ${path.relative(APP_OUT, webMain)}: the web entry point did not build.`,
+    );
+  }
 
-	rebrandWelcomeStrings(buildProductConfiguration().nameLong);
+  rebrandWelcomeStrings(buildProductConfiguration().nameLong);
 
-	// RuntimeCode's own extensions ship alongside the workbench and are wired up
-	// as additionalBuiltinExtensions by the bootstrap. They are plain CommonJS
-	// with no build step, because the web extension host loads them with
-	// `new Function('module','exports','require', src)`.
-	const extensionsSrc = path.join(RC_ROOT, 'extensions');
-	if (existsSync(extensionsSrc)) {
-		const dest = path.join(APP_OUT, 'rc-extensions');
-		rmSync(dest, { recursive: true, force: true });
-		cpSync(extensionsSrc, dest, { recursive: true });
-		console.log('[staticify] copied rc-extensions/');
-	}
+  // RuntimeCode's own extensions ship alongside the workbench and are wired up
+  // as additionalBuiltinExtensions by the bootstrap. They are plain CommonJS
+  // with no build step, because the web extension host loads them with
+  // `new Function('module','exports','require', src)`.
+  const extensionsSrc = path.join(RC_ROOT, "extensions");
+  if (existsSync(extensionsSrc)) {
+    const dest = path.join(APP_OUT, "rc-extensions");
+    rmSync(dest, { recursive: true, force: true });
+    cpSync(extensionsSrc, dest, { recursive: true });
+    console.log("[staticify] copied rc-extensions/");
+  }
 
-	await vendorEruda();
+  await vendorEruda();
 
-	repairWebviewCspHash();
+  repairWebviewCspHash();
 
-	// The webview service worker has to be reachable as a REAL file: service
-	// worker script requests bypass service workers entirely (spec: the request
-	// carries serviceWorkers:'none'), so a copy living only inside RuntimeFS's
-	// virtual tree can never register. Verified in spikes/swtest. It goes to
-	// host-root/ rather than app/ because app/ IS the virtual tree.
-	const builtSw = path.join(APP_OUT, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre', 'service-worker.js');
-	if (!existsSync(builtSw)) {
-		throw new Error(`No webview service worker at ${builtSw}. Webviews cannot work without it.`);
-	}
-	copyFileSync(builtSw, path.join(HOST_OUT, WEBVIEW_SW_NAME));
-	writeFileSync(path.join(HOST_OUT, 'README.txt'), HOST_ROOT_README);
-	console.log(`[staticify] emitted host-root/${WEBVIEW_SW_NAME}`);
+  // The webview service worker has to be reachable as a REAL file: service
+  // worker script requests bypass service workers entirely (spec: the request
+  // carries serviceWorkers:'none'), so a copy living only inside RuntimeFS's
+  // virtual tree can never register. Verified in spikes/swtest. It goes to
+  // host-root/ rather than app/ because app/ IS the virtual tree.
+  const builtSw = path.join(
+    APP_OUT,
+    "out",
+    "vs",
+    "workbench",
+    "contrib",
+    "webview",
+    "browser",
+    "pre",
+    "service-worker.js",
+  );
+  if (!existsSync(builtSw)) {
+    throw new Error(
+      `No webview service worker at ${builtSw}. Webviews cannot work without it.`,
+    );
+  }
+  copyFileSync(builtSw, path.join(HOST_OUT, WEBVIEW_SW_NAME));
+  writeFileSync(path.join(HOST_OUT, "README.txt"), HOST_ROOT_README);
+  console.log(`[staticify] emitted host-root/${WEBVIEW_SW_NAME}`);
 
-	console.log(`[staticify] wrote ${path.join(APP_OUT, 'index.html')} (template: ${path.relative(VSCODE_ROOT, templatePath)})`);
-	console.log(`[staticify] deploy: app/ -> a RuntimeFS folder, host-root/ -> the RuntimeFS host root`);
+  console.log(
+    `[staticify] wrote ${path.join(APP_OUT, "index.html")} (template: ${path.relative(VSCODE_ROOT, templatePath)})`,
+  );
+  console.log(
+    `[staticify] deploy: app/ -> a RuntimeFS folder, host-root/ -> the RuntimeFS host root`,
+  );
 }
 
 await main();

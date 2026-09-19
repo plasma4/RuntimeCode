@@ -12,11 +12,11 @@ upstream or by watching something fail silently in a browser.
 
 Three separate things. Conflating them is the main way this goes wrong.
 
-| Layer | What it is | Where it lives |
-| --- | --- | --- |
-| Runtime host | One small built-in extension: registry, Run command, terminal, tasks, runtime selection | `extensions/runtime-host/` |
-| Runtime pack | One language runtime plus its assets, contributing metadata the host reads | a RuntimeFS folder, installed on demand |
-| Pack pipeline | Build-time fetch, pin and verify; install; registration; cleanup | `scripts/packs.mjs`, the bootstrap, host commands |
+| Layer         | What it is                                                                              | Where it lives                                    |
+| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Runtime host  | One small built-in extension: registry, Run command, terminal, tasks, runtime selection | `extensions/runtime-host/`                        |
+| Runtime pack  | One language runtime plus its assets, contributing metadata the host reads              | a RuntimeFS folder, installed on demand           |
+| Pack pipeline | Build-time fetch, pin and verify; install; registration; cleanup                        | `scripts/packs.mjs`, the bootstrap, host commands |
 
 The host ships with the build and is inert with no packs installed. Packs are
 large, optional, and versioned independently of the workbench.
@@ -115,14 +115,14 @@ fetches from a CDN at run time.
 Almost every capability question reduces to whether the RuntimeCode folder
 carries COOP and COEP.
 
-| | Not isolated | Isolated |
-| --- | --- | --- |
-| `SharedArrayBuffer`, `Atomics.wait` | no | yes |
-| Blocking `stdin` (`input()`, `scanf`) | no, EOF or a prompt dialog | yes, real line-blocking reads |
-| Synchronous WASI syscalls across a worker boundary | no | yes |
-| Threaded wasm builds | no, and the nested-worker polyfill blocks them too | only at a webview site |
-| Cross-origin gallery assets | fine | need CORP; icons likely break |
-| Dev Preview | needs the headers anyway | already the documented state |
+|                                                    | Not isolated                                       | Isolated                      |
+| -------------------------------------------------- | -------------------------------------------------- | ----------------------------- |
+| `SharedArrayBuffer`, `Atomics.wait`                | no                                                 | yes                           |
+| Blocking `stdin` (`input()`, `scanf`)              | no, EOF or a prompt dialog                         | yes, real line-blocking reads |
+| Synchronous WASI syscalls across a worker boundary | no                                                 | yes                           |
+| Threaded wasm builds                               | no, and the nested-worker polyfill blocks them too | only at a webview site        |
+| Cross-origin gallery assets                        | fine                                               | need CORP; icons likely break |
+| Dev Preview                                        | needs the headers anyway                           | already the documented state  |
 
 Three ways to land it, in increasing order of ambition:
 
@@ -142,11 +142,11 @@ have it on day one.
 Where the guest code actually runs. Packs declare which one they need instead of
 each inventing an arrangement.
 
-| Site | Threads | SAB | DOM and canvas | Cost to build | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `worker`, a nested worker from the extension host | no | with isolation | no | low | The default. Classic script only. Dies with the extension host. |
-| `webview`, hidden or visible | yes | with isolation | yes | medium | The only site that can spawn workers. Needed for graphics and pthreads. Webviews are same-origin here (patch 0003). |
-| `window`, a worker owned by the bootstrap and exposed as an embedder command | yes | with isolation | no | medium | Adds divergence in `static/index.html`. |
+| Site                                                                         | Threads | SAB            | DOM and canvas | Cost to build | Notes                                                                                                               |
+| ---------------------------------------------------------------------------- | ------- | -------------- | -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `worker`, a nested worker from the extension host                            | no      | with isolation | no             | low           | The default. Classic script only. Dies with the extension host.                                                     |
+| `webview`, hidden or visible                                                 | yes     | with isolation | yes            | medium        | The only site that can spawn workers. Needed for graphics and pthreads. Webviews are same-origin here (patch 0003). |
+| `window`, a worker owned by the bootstrap and exposed as an embedder command | yes     | with isolation | no             | medium        | Adds divergence in `static/index.html`.                                                                             |
 
 Start with `worker`. Add `webview` when the first pack needs threads or a
 plotting surface, such as matplotlib or SDL. Treat `window` as the fallback,
@@ -195,17 +195,17 @@ export interface RuntimeProvider {
 
 interface RunSpec {
   runtimeId: string;
-  entry: vscode.Uri;          // the file to run
+  entry: vscode.Uri; // the file to run
   argv: string[];
   env: Record<string, string>;
   cwd: vscode.Uri;
-  mounts: Mount[];            // see Filesystem model
-  stdinMode: 'blocking' | 'buffered' | 'none';
+  mounts: Mount[]; // see Filesystem model
+  stdinMode: "blocking" | "buffered" | "none";
 }
 
 interface RuntimeSession {
-  write(data: string): void;  // stdin
-  signal(sig: 'INT' | 'KILL'): void;
+  write(data: string): void; // stdin
+  signal(sig: "INT" | "KILL"): void;
   resize(cols: number, rows: number): void;
   dispose(): void;
   readonly exit: Promise<number>;
@@ -247,11 +247,11 @@ produces bug reports that look like runtime bugs.
 
 ## Standard input
 
-| Mode | Requires | Behaviour |
-| --- | --- | --- |
-| `none` | | reads return EOF at once |
-| `buffered` | | terminal input is queued; a read returns what has arrived, EOF if nothing has |
-| `blocking` | isolation and SAB | `Atomics.wait` on a shared ring buffer, so `input()` really blocks |
+| Mode       | Requires          | Behaviour                                                                     |
+| ---------- | ----------------- | ----------------------------------------------------------------------------- |
+| `none`     |                   | reads return EOF at once                                                      |
+| `buffered` |                   | terminal input is queued; a read returns what has arrived, EOF if nothing has |
+| `blocking` | isolation and SAB | `Atomics.wait` on a shared ring buffer, so `input()` really blocks            |
 
 The host advertises the best mode the environment supports, the pack echoes back
 what it implemented, and the terminal prints one line whenever the answer is
@@ -280,15 +280,15 @@ turns the frontier into a table instead of an argument.
 Sizes are order-of-magnitude guesses, to be replaced by measurements from the
 pack build. Record each pack's license before it ships.
 
-| Language | quick | faithful | Notes |
-| --- | --- | --- | --- |
-| Python | Pyodide, ~10-15 MB core | CPython built for WASI, ~15-20 MB | Pyodide brings `micropip` and prebuilt scientific wheels. The WASI build is unpatched CPython with no wheel ecosystem. Neither gets threads or subprocesses. |
-| JavaScript | worker `eval`, ~0 MB | QuickJS-ng wasm, ~1 MB | The quick tier is the host engine: instant, but host semantics and host globals. QuickJS is isolated and deterministic. TypeScript needs a transform; Sucrase is small, `esbuild-wasm` (~9 MB) is exact. |
-| C | tcc compiled to wasm, ~1 MB | clang with the wasi-sdk sysroot, ~40-100 MB | The clearest pair in the list. Near-instant C99 against a thin libc, or a real toolchain that builds most single-file C and C++. |
-| Ruby | ruby.wasm, ~10-30 MB | | One credible option. Ship it as quick and leave the tier open. |
-| Lua | wasmoon, ~0.5 MB | | Cheap, and a good first pack for proving the contract end to end. |
-| PHP | php-wasm, ~10 MB | | Mature lineage, from WordPress Playground. |
-| SQL | SQLite wasm with the OPFS VFS, ~1 MB | | Not a program runtime, but valuable and a natural fit for the mount model. |
+| Language   | quick                                | faithful                                    | Notes                                                                                                                                                                                                    |
+| ---------- | ------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python     | Pyodide, ~10-15 MB core              | CPython built for WASI, ~15-20 MB           | Pyodide brings `micropip` and prebuilt scientific wheels. The WASI build is unpatched CPython with no wheel ecosystem. Neither gets threads or subprocesses.                                             |
+| JavaScript | worker `eval`, ~0 MB                 | QuickJS-ng wasm, ~1 MB                      | The quick tier is the host engine: instant, but host semantics and host globals. QuickJS is isolated and deterministic. TypeScript needs a transform; Sucrase is small, `esbuild-wasm` (~9 MB) is exact. |
+| C          | tcc compiled to wasm, ~1 MB          | clang with the wasi-sdk sysroot, ~40-100 MB | The clearest pair in the list. Near-instant C99 against a thin libc, or a real toolchain that builds most single-file C and C++.                                                                         |
+| Ruby       | ruby.wasm, ~10-30 MB                 |                                             | One credible option. Ship it as quick and leave the tier open.                                                                                                                                           |
+| Lua        | wasmoon, ~0.5 MB                     |                                             | Cheap, and a good first pack for proving the contract end to end.                                                                                                                                        |
+| PHP        | php-wasm, ~10 MB                     |                                             | Mature lineage, from WordPress Playground.                                                                                                                                                               |
+| SQL        | SQLite wasm with the OPFS VFS, ~1 MB |                                             | Not a program runtime, but valuable and a natural fit for the mount model.                                                                                                                               |
 
 Deferred, with the reasons worth keeping written down. Go and Rust: the compilers
 are not browser-hostable at a sane size, and TinyGo needs a server. Java:
@@ -365,17 +365,24 @@ Each spike below is a standalone page under `spikes/`, run in a real browser, an
 against a real RuntimeFS deployment whenever the question involves the service
 worker.
 
-| Spike | Question | Pass looks like |
-| --- | --- | --- |
-| `coi` | Does COOP and COEP on the RuntimeCode folder give `crossOriginIsolated` in the window, the extension host worker and a webview, and what breaks? | SAB constructs in all three, plus an itemised list of broken cross-origin assets |
-| `nestedworker` | Does a classic-script worker start from the extension host, and does `importScripts` of a `/n/` URL go through RuntimeFS's service worker? | wasm instantiates in the nested worker, served out of OPFS |
-| `syncfs` | Can a worker use sync access handles on a RuntimeFS folder, under `rfs_write_<name>`, without breaking serving? | the file round-trips and the folder still serves during and after |
-| `stdin` | Does `Atomics.wait` blocking stdin survive the polyfilled worker's MessagePort proxy? | interactive `input()` in a pseudoterminal |
-| `packload` | Does `additionalBuiltinExtensions` accept a `/n/<Packs>/<id>/` URI and activate the extension? | a trivial pack's command appears and runs |
-| `webviewsite` | Can a webview spawn workers and run a threaded wasm build under isolation? | a pthreads build reports more than one thread |
+| Spike          | Question                                                                                                                                         | Pass looks like                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `coi`          | Does COOP and COEP on the RuntimeCode folder give `crossOriginIsolated` in the window, the extension host worker and a webview, and what breaks? | SAB constructs in all three, plus an itemised list of broken cross-origin assets |
+| `nestedworker` | Does a classic-script worker start from the extension host, and does `importScripts` of a `/n/` URL go through RuntimeFS's service worker?       | wasm instantiates in the nested worker, served out of OPFS                       |
+| `syncfs`       | Can a worker use sync access handles on a RuntimeFS folder, under `rfs_write_<name>`, without breaking serving?                                  | the file round-trips and the folder still serves during and after                |
+| `stdin`        | Does `Atomics.wait` blocking stdin survive the polyfilled worker's MessagePort proxy?                                                            | interactive `input()` in a pseudoterminal                                        |
+| `packload`     | Does `additionalBuiltinExtensions` accept a `/n/<Packs>/<id>/` URI and activate the extension?                                                   | a trivial pack's command appears and runs                                        |
+| `webviewsite`  | Can a webview spawn workers and run a threaded wasm build under isolation?                                                                       | a pthreads build reports more than one thread                                    |
 
 `packload` and `nestedworker` can invalidate the whole architecture. Run those
 two first.
+
+`node scripts/serve.mjs --coi` sets COOP and COEP on every response, which is
+enough to answer the `crossOriginIsolated` half of the `coi` spike without
+editing a live folder's Custom Headers. It cannot answer the other half: locally
+everything is same-origin, so nothing is there to be blocked, and the inventory
+of what `require-corp` breaks only exists against a real deployment with the
+extension gallery reachable.
 
 ## Conformance and benchmarks
 
@@ -396,14 +403,14 @@ A new pack is not done until it has a conformance row.
 
 ## Milestones
 
-| | Deliverable | Done when |
-| --- | --- | --- |
-| M0 | The six spikes | Findings written into this file, architecture confirmed or changed |
-| M1 | `extensions/runtime-host/` and one tiny pack (Lua or QuickJS), built in-tree | A file runs, output lands in a pseudoterminal, non-zero exit codes propagate |
-| M2 | `scripts/packs.mjs`, the catalog, install and uninstall and cleanup, bootstrap registration | A pack installs from the packs folder, survives a reload, uninstalls cleanly |
-| M3 | Python quick tier, the mount table, the stdin tiers | A script reads and writes workspace files; `input()` works under isolation and degrades with a message without it |
-| M4 | A second tier for one language, plus the conformance and benchmark harness | Two Python runtimes, one table comparing them, a picker that explains the difference |
-| M5 | An inline DAP debug adapter for one runtime | Breakpoints and stepping in the web debug UI |
+|     | Deliverable                                                                                 | Done when                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| M0  | The six spikes                                                                              | Findings written into this file, architecture confirmed or changed                                                |
+| M1  | `extensions/runtime-host/` and one tiny pack (Lua or QuickJS), built in-tree                | A file runs, output lands in a pseudoterminal, non-zero exit codes propagate                                      |
+| M2  | `scripts/packs.mjs`, the catalog, install and uninstall and cleanup, bootstrap registration | A pack installs from the packs folder, survives a reload, uninstalls cleanly                                      |
+| M3  | Python quick tier, the mount table, the stdin tiers                                         | A script reads and writes workspace files; `input()` works under isolation and degrades with a message without it |
+| M4  | A second tier for one language, plus the conformance and benchmark harness                  | Two Python runtimes, one table comparing them, a picker that explains the difference                              |
+| M5  | An inline DAP debug adapter for one runtime                                                 | Breakpoints and stepping in the web debug UI                                                                      |
 
 M0 and M1 are small. M2 is where the real work is, because it touches the
 bootstrap, the deploy story and `check-deploy.mjs`.

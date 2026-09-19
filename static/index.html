@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 	<script>performance.mark('code/didStartRenderer');</script>
 	<meta charset="utf-8" />
@@ -7,7 +8,8 @@
 	<meta name="mobile-web-app-capable" content="yes" />
 	<meta name="apple-mobile-web-app-capable" content="yes" />
 	<meta name="apple-mobile-web-app-title" content="RuntimeCode">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+	<meta name="viewport"
+		content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
 	<!--
 		RuntimeCode's own bootstrap.
@@ -26,10 +28,19 @@
 	<link rel="manifest" href="./manifest.json" crossorigin="use-credentials" />
 	<link rel="stylesheet" href="./out/vs/workbench/workbench.web.main.internal.css">
 	<style>
-		html, body { height: 100%; margin: 0; overflow: hidden; }
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+		}
+
 		#rc-error {
-			display: none; font: 13px ui-monospace, monospace; padding: 1rem;
-			color: #d33; white-space: pre-wrap;
+			display: none;
+			font: 13px ui-monospace, monospace;
+			padding: 1rem;
+			color: #d33;
+			white-space: pre-wrap;
 		}
 	</style>
 </head>
@@ -117,15 +128,48 @@
 		};
 
 		/**
-		 * Where RuntimeFS is mounted. RuntimeCode is normally served *from* a
-		 * RuntimeFS folder, so everything before the `/n/` segment is the
-		 * RuntimeFS root. Returns undefined when hosted standalone, which the
-		 * extension reports rather than opening a broken preview.
+		 * RuntimeFS's own worker, by script name. rfs.js registers `./sw.min.js`
+		 * (its SW_URL, which that file invites you to change) and sw.js is the
+		 * unminified build of the same thing. rc-webview-sw.js has to fail this
+		 * test: it is a real file at the same root, and the leading slash is
+		 * what keeps it out.
+		 */
+		const RUNTIMEFS_WORKER = /\/sw(\.min)?\.js$/;
+
+		/**
+		 * The directory RuntimeFS is served from, or undefined.
+		 *
+		 * Two derivations, because there are two deployments.
+		 *
+		 * Served from inside a RuntimeFS folder, the URL says it: everything
+		 * before the `/n/` segment is the root. That is authoritative, because a
+		 * `/n/` path cannot be reached at all unless RuntimeFS's worker served
+		 * it, so it is tried first.
+		 *
+		 * Served from real files on the server, there is no `/n/` segment, and
+		 * RuntimeFS can still be there. sw.js:41 computes its own base as
+		 * `new URL("./", self.location)` and rfs.js:138 registers it with the
+		 * default scope, so it controls every page in that directory rather than
+		 * only the virtual ones. RuntimeCode at <root>/rc/ is controlled by it
+		 * and can fetch <root>/n/<Folder>/ perfectly well. Reading the root back
+		 * off the controller's script URL is the same computation the worker
+		 * does, which keeps this derived instead of configured.
+		 *
+		 * A page that loads inside an active worker's scope is controlled from
+		 * the start, so there is no window where this is merely too early. No
+		 * controller means RuntimeFS has never been opened in this browser, and
+		 * a deployment that renamed SW_URL reports standalone, which is what
+		 * every server-path deployment did before.
 		 */
 		const getRuntimeFsBase = async () => {
 			const url = new URL(window.location.href);
 			const index = url.pathname.indexOf('/n/');
-			return index === -1 ? undefined : url.origin + url.pathname.slice(0, index);
+			if (index !== -1) { return url.origin + url.pathname.slice(0, index); }
+
+			const script = navigator.serviceWorker?.controller?.scriptURL;
+			if (!script || !RUNTIMEFS_WORKER.test(new URL(script).pathname)) { return undefined; }
+			// No trailing slash: callers append `/n/<path>` and `/little-export.core.js`.
+			return new URL('./', script).toString().replace(/\/$/, '');
 		};
 
 		const getRuntimeCodeBase = async () => new URL('./', window.location.href).toString();
@@ -148,24 +192,13 @@
 			}
 		};
 
-		const updateRfsRegistry = async (name) => {
-			const write = async () => {
-				const root = await navigator.storage.getDirectory();
-				let registry = {};
-				try {
-					const file = await (await root.getFileHandle('rfs_system.json')).getFile();
-					registry = JSON.parse(await file.text()) || {};
-				} catch { /* first RuntimeFS folder */ }
-				registry[name] = { ...(registry[name] || {}), encryptionType: null, lastModified: Date.now() };
-				const handle = await root.getFileHandle('rfs_system.json', { create: true });
-				const writable = await handle.createWritable();
-				await writable.write(JSON.stringify(registry));
-				await writable.close();
-			};
-			return navigator.locks ? navigator.locks.request('rfs_registry_lock', { mode: 'exclusive' }, write) : write();
-		};
-
-		/** Pick a native directory, copy it to OPFS, and make it a RuntimeFS folder. */
+		/**
+		 * Pick a native directory and copy it into OPFS under rfs/<name>, then hand
+		 * the name back. Only the copying happens here, because only the window has
+		 * the picker. Registering the folder in rfs_system.json is the extension's
+		 * job: a second registry writer living here was free to drift from the one
+		 * in extension.js, and this one was the one no test could reach.
+		 */
 		const importRfsFolder = async () => {
 			if (!window.showDirectoryPicker) {
 				throw new Error('Import RuntimeFS Folder requires Chromium\'s directory picker.');
@@ -183,8 +216,6 @@
 				if (exists && !window.confirm(`Replace the existing RuntimeFS folder "${name}"?`)) { return undefined; }
 				if (exists) { await rfs.removeEntry(name, { recursive: true }); }
 				await copyDirectory(source, await rfs.getDirectoryHandle(name, { create: true }));
-				await updateRfsRegistry(name);
-				await invalidateRfsCache(name);
 				return name;
 			};
 			return navigator.locks ? navigator.locks.request(`rfs_write_${name}`, copy) : copy();
@@ -255,4 +286,5 @@
 		throw err;
 	}
 </script>
+
 </html>

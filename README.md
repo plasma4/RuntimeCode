@@ -38,19 +38,19 @@ is an input and it is enormous. It defaults to `../vscode`; set
 
 ## Layout
 
-| Path | Purpose |
-| --- | --- |
-| `vscode.pin` | Upstream release tag to build from (currently 1.137.0) |
-| `product.overlay.json` | Deep-merged over upstream `product.json` |
-| `overlay/` | Whole files copied into the checkout |
-| `patches/` | Numbered patch series, each with its rationale in the header |
-| `static/` | Our bootstrap `index.html` and the Dev Preview host page |
-| `extensions/runtimefs/` | The web extension providing the `rfs:` filesystem |
-| `scripts/` | prepare, build, staticify, check-endpoints, check-deploy, upgrade, serve |
-| `fixtures/` | Sample project served at `/n/<name>/` by `serve.mjs --simulate-rfs` |
-| `test/` | Tests for the RuntimeFS extension, run with `node --test test/` |
-| `spikes/` | Standalone browser experiments |
-| `dist/` | Build output, gitignored |
+| Path                    | Purpose                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| `vscode.pin`            | Upstream release tag to build from (currently 1.137.0)                                |
+| `product.overlay.json`  | Deep-merged over upstream `product.json`                                              |
+| `overlay/`              | Whole files copied into the checkout                                                  |
+| `patches/`              | Numbered patch series, each with its rationale in the header                          |
+| `static/`               | Our bootstrap `index.html` and the Dev Preview host page                              |
+| `extensions/runtimefs/` | The web extension providing the `rfs:` filesystem                                     |
+| `scripts/`              | prepare, build, staticify, check-endpoints, check-deploy, upgrade, serve              |
+| `fixtures/`             | Sample project served at `/n/<name>/` by `serve.mjs --simulate-rfs`                   |
+| `test/`                 | Tests for the RuntimeFS extension and the build helpers, run with `node --test test/` |
+| `spikes/`               | Standalone browser experiments                                                        |
+| `dist/`                 | Build output, gitignored                                                              |
 
 Environment variables: `RUNTIMECODE_VSCODE` for the upstream checkout,
 `RUNTIMECODE_RFS` for a RuntimeFS checkout (only `serve.mjs --with-rfs` uses it),
@@ -59,11 +59,17 @@ Environment variables: `RUNTIMECODE_VSCODE` for the upstream checkout,
 ## Build
 
 ```sh
-nvm use                      # 24.18.0, per ../vscode/.nvmrc
+nvm use 24.18.0              # the version in ../vscode/.nvmrc
 node scripts/prepare.mjs     # checkout pin, apply overlay + product + patches
 node scripts/build.mjs       # gulp + staticify + endpoint gate
 node scripts/serve.mjs       # http://127.0.0.1:8099
 ```
+
+The version has to be named. `.nvmrc` belongs to the checkout, and nvm only
+searches the current directory and its parents, so a bare `nvm use` here finds
+nothing and leaves the shell on whatever node it had. `build.mjs` checks the
+running version against that file and refuses to start on the wrong one, because
+the failure otherwise arrives deep inside gulp.
 
 `build.mjs` defaults to the fast path: unminified, using the `-ci` gulp variants
 that reuse `out-build/`. Add `--min` for a release build and `--full` to force a
@@ -214,6 +220,12 @@ racing them: the `rfs_registry_lock` around `rfs_system.json`, and the per-folde
 Commands: Open RuntimeFS Folder, New RuntimeFS Folder, Import RuntimeFS Folder,
 Export Folder Locally, Refresh RuntimeFS Cache.
 
+Open RuntimeFS Folder creates as well as opens. The folder list carries a pinned
+`New RuntimeFS Folder...` entry, and typing a name that is not on the list turns
+it into `Create "<name>"`, the way the Git branch picker does. Typing into a
+plain quick pick otherwise filters everything away and leaves the user looking
+at an empty list with no way forward.
+
 On the Welcome page, RuntimeFS folders are tinted with
 `welcomePage.runtimeFSForeground` in both the Start list and Recent, and their
 Recent entries show no path. A RuntimeFS folder is addressed by name alone, so
@@ -261,12 +273,22 @@ True Preview (`Alt+Shift+L Alt+O`) opens the target `/n/<Folder>/…` URL direct
 It deliberately has no wrapper, no auto-reload, no cache-buster and no inspector,
 so it behaves exactly as RuntimeFS serves the project.
 
-Both derive their URL from where RuntimeCode itself is served: everything before
-the `/n/` segment is the RuntimeFS root. Served standalone there is no `/n/`
-segment, and the command says so rather than opening a broken tab. `window.open`
-and `window.location` are both unavailable in the extension host worker, so the
-bootstrap exposes `runtimecode.internal.getRuntimeFsBase` and
-`runtimecode.internal.openExternalTab` as embedder commands.
+Both need to know where RuntimeFS is, and the bootstrap derives it rather than
+taking it as configuration. Served from inside a RuntimeFS folder, the URL says
+it: everything before the `/n/` segment is the root, and nothing else could have
+served that path. Served from real files on a server instead, RuntimeFS may
+still be installed at the origin, and its worker's script URL gives the same
+answer: `sw.js` computes its own base as `new URL("./", self.location)` and
+`rfs.js` registers it with the default scope, so it controls every page in that
+directory and not only the virtual ones. So RuntimeCode can sit at `<root>/rc/`
+as ordinary server files, keep a 240 MB editor out of the user's OPFS quota, and
+still preview `<root>/n/<Folder>/` normally.
+
+Only when neither holds is the instance standalone, and then the command says so
+rather than opening a tab that cannot work. `window.open` and `window.location`
+are both unavailable in the extension host worker, so the bootstrap exposes
+`runtimecode.internal.getRuntimeFsBase` and `runtimecode.internal.openExternalTab`
+as embedder commands.
 
 ### Preview inspector
 
@@ -283,9 +305,9 @@ inspector-unavailable message rather than having its CSP weakened.
 
 The build produces two folders, and both have to be uploaded.
 
-| Build output | Goes to | If you skip it |
-| --- | --- | --- |
-| `dist/app/` | any RuntimeFS folder, e.g. `/n/RC/` | nothing loads at all |
+| Build output      | Goes to                                                                      | If you skip it                                      |
+| ----------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
+| `dist/app/`       | any RuntimeFS folder, e.g. `/n/RC/`                                          | nothing loads at all                                |
 | `dist/host-root/` | the RuntimeFS **host root**, beside RuntimeFS's own `index.html` and `sw.js` | every webview fails, with no useful console message |
 
 Host root means the real origin path RuntimeFS is served from. If RuntimeFS lives

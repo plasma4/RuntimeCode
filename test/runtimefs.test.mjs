@@ -9,77 +9,110 @@
  * from inside the editor: the per-folder write lock, the registry lock, and the
  * cache invalidation without which a preview tab keeps serving the old file.
  */
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test } from "node:test";
+import assert from "node:assert/strict";
 
-import { loadExtension, rfsFolder, settle, MANIFEST } from './harness.mjs';
+import { loadExtension, rfsFolder, settle, MANIFEST } from "./harness.mjs";
 
-const uri = (vscode, path) => vscode.Uri.from({ scheme: 'rfs', path });
-const text = (bytes) => Buffer.from(bytes).toString('utf8');
-const bytes = (value) => new Uint8Array(Buffer.from(value, 'utf8'));
+const uri = (vscode, path) => vscode.Uri.from({ scheme: "rfs", path });
+const text = (bytes) => Buffer.from(bytes).toString("utf8");
+const bytes = (value) => new Uint8Array(Buffer.from(value, "utf8"));
+
+/** What the workbench delivers after a settings write, from either side. */
+const fireConfigurationChange = async (listeners, key) => {
+  for (const listener of listeners.configuration) {
+    await listener({ affectsConfiguration: (section) => section === key });
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Loading rules
 // ---------------------------------------------------------------------------
 
-test('loads as CommonJS with vscode as its only dependency', () => {
-	const { exports, requested } = loadExtension();
+test("loads as CommonJS with vscode as its only dependency", () => {
+  const { exports, requested } = loadExtension();
 
-	assert.equal(typeof exports.activate, 'function');
-	assert.equal(typeof exports.deactivate, 'function');
-	assert.deepEqual([...new Set(requested)], ['vscode']);
+  assert.equal(typeof exports.activate, "function");
+  assert.equal(typeof exports.deactivate, "function");
+  assert.deepEqual([...new Set(requested)], ["vscode"]);
 });
 
-test('activate registers the rfs provider and every command the manifest declares', () => {
-	const { exports, vscode, commands, registered } = loadExtension();
-	exports.activate({ subscriptions: [] });
+test("activate registers the rfs provider and every command the manifest declares", () => {
+  const { exports, vscode, commands, registered } = loadExtension();
+  exports.activate({ subscriptions: [] });
 
-	assert.equal(registered.fileSystemProvider.scheme, 'rfs');
-	assert.equal(typeof registered.fileSystemProvider.provider.readFile, 'function');
+  assert.equal(registered.fileSystemProvider.scheme, "rfs");
+  assert.equal(
+    typeof registered.fileSystemProvider.provider.readFile,
+    "function",
+  );
 
-	const declared = MANIFEST.contributes.commands.map(command => command.command).sort();
-	assert.deepEqual([...commands.keys()].sort(), declared,
-		'package.json and activate() disagree about which commands exist');
+  const declared = MANIFEST.contributes.commands
+    .map((command) => command.command)
+    .sort();
+  assert.deepEqual(
+    [...commands.keys()].sort(),
+    declared,
+    "package.json and activate() disagree about which commands exist",
+  );
 
-	// Keybindings and menus can only reference commands that are declared.
-	const keybound = (MANIFEST.contributes.keybindings ?? []).map(binding => binding.command);
-	const menued = Object.values(MANIFEST.contributes.menus ?? {}).flat().map(item => item.command);
-	for (const command of [...keybound, ...menued]) {
-		assert.ok(declared.includes(command), `${command} is bound but never declared`);
-	}
-	assert.ok(vscode);
+  // Keybindings and menus can only reference commands that are declared.
+  const keybound = (MANIFEST.contributes.keybindings ?? []).map(
+    (binding) => binding.command,
+  );
+  const menued = Object.values(MANIFEST.contributes.menus ?? {})
+    .flat()
+    .map((item) => item.command);
+  for (const command of [...keybound, ...menued]) {
+    assert.ok(
+      declared.includes(command),
+      `${command} is bound but never declared`,
+    );
+  }
+  assert.ok(vscode);
 });
 
 // ---------------------------------------------------------------------------
 // URI mapping
 // ---------------------------------------------------------------------------
 
-test('parseUri splits rfs: paths and decodes segments', () => {
-	const { internals, vscode } = loadExtension();
+test("parseUri splits rfs: paths and decodes segments", () => {
+  const { internals, vscode } = loadExtension();
 
-	assert.deepEqual(internals.parseUri(uri(vscode, '/Site')), { folder: 'Site', parts: [] });
-	assert.deepEqual(internals.parseUri(uri(vscode, '/Site/src/app.js')),
-		{ folder: 'Site', parts: ['src', 'app.js'] });
-	assert.deepEqual(internals.parseUri(uri(vscode, '/My%20Site/a%20b.txt')),
-		{ folder: 'My Site', parts: ['a b.txt'] });
+  assert.deepEqual(internals.parseUri(uri(vscode, "/Site")), {
+    folder: "Site",
+    parts: [],
+  });
+  assert.deepEqual(internals.parseUri(uri(vscode, "/Site/src/app.js")), {
+    folder: "Site",
+    parts: ["src", "app.js"],
+  });
+  assert.deepEqual(internals.parseUri(uri(vscode, "/My%20Site/a%20b.txt")), {
+    folder: "My Site",
+    parts: ["a b.txt"],
+  });
 
-	assert.throws(() => internals.parseUri(uri(vscode, '/')), { code: 'FileNotFound' });
+  assert.throws(() => internals.parseUri(uri(vscode, "/")), {
+    code: "FileNotFound",
+  });
 });
 
-test('toFileSystemError maps OPFS failures onto what VS Code expects', () => {
-	const { internals, vscode } = loadExtension();
-	const target = uri(vscode, '/Site/a.txt');
-	const as = (name) => internals.toFileSystemError(Object.assign(new Error('x'), { name }), target).code;
+test("toFileSystemError maps OPFS failures onto what VS Code expects", () => {
+  const { internals, vscode } = loadExtension();
+  const target = uri(vscode, "/Site/a.txt");
+  const as = (name) =>
+    internals.toFileSystemError(Object.assign(new Error("x"), { name }), target)
+      .code;
 
-	assert.equal(as('NotFoundError'), 'FileNotFound');
-	assert.equal(as('TypeMismatchError'), 'FileNotADirectory');
-	assert.equal(as('InvalidModificationError'), 'FileExists');
-	assert.equal(as('NoModificationAllowedError'), 'NoPermissions');
-	assert.equal(as('NotAllowedError'), 'NoPermissions');
+  assert.equal(as("NotFoundError"), "FileNotFound");
+  assert.equal(as("TypeMismatchError"), "FileNotADirectory");
+  assert.equal(as("InvalidModificationError"), "FileExists");
+  assert.equal(as("NoModificationAllowedError"), "NoPermissions");
+  assert.equal(as("NotAllowedError"), "NoPermissions");
 
-	// Anything else has to come through unchanged, or a real bug reads as ENOENT.
-	const other = new Error('boom');
-	assert.equal(internals.toFileSystemError(other, target), other);
+  // Anything else has to come through unchanged, or a real bug reads as ENOENT.
+  const other = new Error("boom");
+  assert.equal(internals.toFileSystemError(other, target), other);
 });
 
 // ---------------------------------------------------------------------------
@@ -87,274 +120,740 @@ test('toFileSystemError maps OPFS failures onto what VS Code expects', () => {
 // ---------------------------------------------------------------------------
 
 async function provider(files = {}) {
-	const invalidated = [];
-	const loaded = loadExtension({
-		hostCommands: {
-			'runtimecode.internal.invalidateRfsCache': async (folder) => { invalidated.push(folder); return true; }
-		}
-	});
-	await rfsFolder(loaded.opfs, 'Site', files);
-	return { ...loaded, invalidated, fs: new loaded.internals.RuntimeFSProvider() };
+  const invalidated = [];
+  const loaded = loadExtension({
+    hostCommands: {
+      "runtimecode.internal.invalidateRfsCache": async (folder) => {
+        invalidated.push(folder);
+        return true;
+      },
+    },
+  });
+  await rfsFolder(loaded.opfs, "Site", files);
+  return {
+    ...loaded,
+    invalidated,
+    fs: new loaded.internals.RuntimeFSProvider(),
+  };
 }
 
-test('reads, writes and stats files', async () => {
-	const { fs, vscode } = await provider({ 'index.html': '<h1>hi</h1>', 'src/app.js': 'export {}' });
+test("reads, writes and stats files", async () => {
+  const { fs, vscode } = await provider({
+    "index.html": "<h1>hi</h1>",
+    "src/app.js": "export {}",
+  });
 
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/index.html'))), '<h1>hi</h1>');
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/src/app.js'))), 'export {}');
+  assert.equal(
+    text(await fs.readFile(uri(vscode, "/Site/index.html"))),
+    "<h1>hi</h1>",
+  );
+  assert.equal(
+    text(await fs.readFile(uri(vscode, "/Site/src/app.js"))),
+    "export {}",
+  );
 
-	const stat = await fs.stat(uri(vscode, '/Site/index.html'));
-	assert.equal(stat.type, vscode.FileType.File);
-	assert.equal(stat.size, 11);
+  const stat = await fs.stat(uri(vscode, "/Site/index.html"));
+  assert.equal(stat.type, vscode.FileType.File);
+  assert.equal(stat.size, 11);
 
-	assert.equal((await fs.stat(uri(vscode, '/Site/src'))).type, vscode.FileType.Directory);
-	assert.equal((await fs.stat(uri(vscode, '/Site'))).type, vscode.FileType.Directory);
+  assert.equal(
+    (await fs.stat(uri(vscode, "/Site/src"))).type,
+    vscode.FileType.Directory,
+  );
+  assert.equal(
+    (await fs.stat(uri(vscode, "/Site"))).type,
+    vscode.FileType.Directory,
+  );
 
-	await assert.rejects(fs.stat(uri(vscode, '/Site/missing.txt')), { code: 'FileNotFound' });
-	await assert.rejects(fs.readFile(uri(vscode, '/Site/missing.txt')), { code: 'FileNotFound' });
+  await assert.rejects(fs.stat(uri(vscode, "/Site/missing.txt")), {
+    code: "FileNotFound",
+  });
+  await assert.rejects(fs.readFile(uri(vscode, "/Site/missing.txt")), {
+    code: "FileNotFound",
+  });
 });
 
-test('readDirectory reports files and directories', async () => {
-	const { fs, vscode } = await provider({ 'index.html': 'x', 'src/app.js': 'y', 'empty': null });
+test("readDirectory reports files and directories", async () => {
+  const { fs, vscode } = await provider({
+    "index.html": "x",
+    "src/app.js": "y",
+    empty: null,
+  });
 
-	const entries = await fs.readDirectory(uri(vscode, '/Site'));
-	assert.deepEqual(entries.sort(), [
-		['empty', vscode.FileType.Directory],
-		['index.html', vscode.FileType.File],
-		['src', vscode.FileType.Directory]
-	].sort());
+  const entries = await fs.readDirectory(uri(vscode, "/Site"));
+  assert.deepEqual(
+    entries.sort(),
+    [
+      ["empty", vscode.FileType.Directory],
+      ["index.html", vscode.FileType.File],
+      ["src", vscode.FileType.Directory],
+    ].sort(),
+  );
 });
 
-test('writeFile honours create and overwrite', async () => {
-	const { fs, vscode } = await provider({ 'index.html': 'old' });
+test("writeFile honours create and overwrite", async () => {
+  const { fs, vscode } = await provider({ "index.html": "old" });
 
-	await assert.rejects(
-		fs.writeFile(uri(vscode, '/Site/new.txt'), bytes('x'), { create: false, overwrite: true }),
-		{ code: 'FileNotFound' });
-	await assert.rejects(
-		fs.writeFile(uri(vscode, '/Site/index.html'), bytes('x'), { create: true, overwrite: false }),
-		{ code: 'FileExists' });
+  await assert.rejects(
+    fs.writeFile(uri(vscode, "/Site/new.txt"), bytes("x"), {
+      create: false,
+      overwrite: true,
+    }),
+    { code: "FileNotFound" },
+  );
+  await assert.rejects(
+    fs.writeFile(uri(vscode, "/Site/index.html"), bytes("x"), {
+      create: true,
+      overwrite: false,
+    }),
+    { code: "FileExists" },
+  );
 
-	await fs.writeFile(uri(vscode, '/Site/index.html'), bytes('new'), { create: true, overwrite: true });
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/index.html'))), 'new');
+  await fs.writeFile(uri(vscode, "/Site/index.html"), bytes("new"), {
+    create: true,
+    overwrite: true,
+  });
+  assert.equal(text(await fs.readFile(uri(vscode, "/Site/index.html"))), "new");
 
-	await fs.writeFile(uri(vscode, '/Site/deep/nested/file.txt'), bytes('made'), { create: true, overwrite: true });
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/deep/nested/file.txt'))), 'made');
+  await fs.writeFile(uri(vscode, "/Site/deep/nested/file.txt"), bytes("made"), {
+    create: true,
+    overwrite: true,
+  });
+  assert.equal(
+    text(await fs.readFile(uri(vscode, "/Site/deep/nested/file.txt"))),
+    "made",
+  );
 });
 
-test('writes take the RuntimeFS folder lock and invalidate its cache', async () => {
-	const { fs, vscode, calls, invalidated } = await provider({ 'index.html': 'old' });
+test("writes take the RuntimeFS folder lock and invalidate its cache", async () => {
+  const { fs, vscode, calls, invalidated } = await provider({
+    "index.html": "old",
+  });
 
-	await fs.writeFile(uri(vscode, '/Site/index.html'), bytes('new'), { create: true, overwrite: true });
+  await fs.writeFile(uri(vscode, "/Site/index.html"), bytes("new"), {
+    create: true,
+    overwrite: true,
+  });
 
-	assert.ok(calls.locks.includes('rfs_write_Site'),
-		'a write that skips rfs_write_<name> can interleave with RuntimeFS');
-	assert.deepEqual(invalidated, ['Site'],
-		'without invalidation the preview keeps serving the file that was just replaced');
+  assert.ok(
+    calls.locks.includes("rfs_write_Site"),
+    "a write that skips rfs_write_<name> can interleave with RuntimeFS",
+  );
+  assert.deepEqual(
+    invalidated,
+    ["Site"],
+    "without invalidation the preview keeps serving the file that was just replaced",
+  );
 });
 
-test('file events are emitted, and coalesced', async () => {
-	const { fs, vscode } = await provider({ 'index.html': 'old' });
-	// Copied on arrival: the provider reuses and truncates its buffer after
-	// firing, the way the workbench (a synchronous consumer) expects.
-	const batches = [];
-	fs.onDidChangeFile(events => batches.push([...events]));
+test("file events are emitted, and coalesced", async () => {
+  const { fs, vscode } = await provider({ "index.html": "old" });
+  // Copied on arrival: the provider reuses and truncates its buffer after
+  // firing, the way the workbench (a synchronous consumer) expects.
+  const batches = [];
+  fs.onDidChangeFile((events) => batches.push([...events]));
 
-	await fs.writeFile(uri(vscode, '/Site/a.txt'), bytes('1'), { create: true, overwrite: true });
-	await fs.writeFile(uri(vscode, '/Site/b.txt'), bytes('2'), { create: true, overwrite: true });
-	await settle();
+  await fs.writeFile(uri(vscode, "/Site/a.txt"), bytes("1"), {
+    create: true,
+    overwrite: true,
+  });
+  await fs.writeFile(uri(vscode, "/Site/b.txt"), bytes("2"), {
+    create: true,
+    overwrite: true,
+  });
+  await settle();
 
-	assert.equal(batches.length, 1, 'a bulk write should not produce one notification per file');
-	assert.deepEqual(batches[0].map(event => event.type), [vscode.FileChangeType.Created, vscode.FileChangeType.Created]);
+  assert.equal(
+    batches.length,
+    1,
+    "a bulk write should not produce one notification per file",
+  );
+  assert.deepEqual(
+    batches[0].map((event) => event.type),
+    [vscode.FileChangeType.Created, vscode.FileChangeType.Created],
+  );
 
-	await fs.writeFile(uri(vscode, '/Site/a.txt'), bytes('3'), { create: true, overwrite: true });
-	await settle();
-	assert.deepEqual(batches[1].map(event => event.type), [vscode.FileChangeType.Changed]);
+  await fs.writeFile(uri(vscode, "/Site/a.txt"), bytes("3"), {
+    create: true,
+    overwrite: true,
+  });
+  await settle();
+  assert.deepEqual(
+    batches[1].map((event) => event.type),
+    [vscode.FileChangeType.Changed],
+  );
 });
 
-test('delete removes entries but refuses the workspace root', async () => {
-	const { fs, vscode, invalidated } = await provider({ 'index.html': 'x', 'src/app.js': 'y' });
+test("delete removes entries but refuses the workspace root", async () => {
+  const { fs, vscode, invalidated } = await provider({
+    "index.html": "x",
+    "src/app.js": "y",
+  });
 
-	await assert.rejects(fs.delete(uri(vscode, '/Site'), { recursive: true }), { code: 'NoPermissions' },
-		'deleting the folder itself belongs to the RuntimeFS UI, which owns the registry entry');
+  await assert.rejects(
+    fs.delete(uri(vscode, "/Site"), { recursive: true }),
+    { code: "NoPermissions" },
+    "deleting the folder itself belongs to the RuntimeFS UI, which owns the registry entry",
+  );
 
-	await fs.delete(uri(vscode, '/Site/index.html'), { recursive: false });
-	await assert.rejects(fs.stat(uri(vscode, '/Site/index.html')), { code: 'FileNotFound' });
+  await fs.delete(uri(vscode, "/Site/index.html"), { recursive: false });
+  await assert.rejects(fs.stat(uri(vscode, "/Site/index.html")), {
+    code: "FileNotFound",
+  });
 
-	await fs.delete(uri(vscode, '/Site/src'), { recursive: true });
-	assert.deepEqual(await fs.readDirectory(uri(vscode, '/Site')), []);
-	assert.deepEqual(invalidated, ['Site', 'Site']);
+  await fs.delete(uri(vscode, "/Site/src"), { recursive: true });
+  assert.deepEqual(await fs.readDirectory(uri(vscode, "/Site")), []);
+  assert.deepEqual(invalidated, ["Site", "Site"]);
 });
 
-test('rename copies then deletes, for files and whole trees', async () => {
-	const { fs, vscode } = await provider({ 'a.txt': 'one', 'src/app.js': 'two', 'src/lib/util.js': 'three' });
+test("rename copies then deletes, for files and whole trees", async () => {
+  const { fs, vscode } = await provider({
+    "a.txt": "one",
+    "src/app.js": "two",
+    "src/lib/util.js": "three",
+  });
 
-	await fs.rename(uri(vscode, '/Site/a.txt'), uri(vscode, '/Site/b.txt'), { overwrite: false });
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/b.txt'))), 'one');
-	await assert.rejects(fs.stat(uri(vscode, '/Site/a.txt')), { code: 'FileNotFound' });
+  await fs.rename(uri(vscode, "/Site/a.txt"), uri(vscode, "/Site/b.txt"), {
+    overwrite: false,
+  });
+  assert.equal(text(await fs.readFile(uri(vscode, "/Site/b.txt"))), "one");
+  await assert.rejects(fs.stat(uri(vscode, "/Site/a.txt")), {
+    code: "FileNotFound",
+  });
 
-	await fs.rename(uri(vscode, '/Site/src'), uri(vscode, '/Site/lib'), { overwrite: false });
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/lib/app.js'))), 'two');
-	assert.equal(text(await fs.readFile(uri(vscode, '/Site/lib/lib/util.js'))), 'three');
-	await assert.rejects(fs.stat(uri(vscode, '/Site/src')), { code: 'FileNotFound' });
+  await fs.rename(uri(vscode, "/Site/src"), uri(vscode, "/Site/lib"), {
+    overwrite: false,
+  });
+  assert.equal(text(await fs.readFile(uri(vscode, "/Site/lib/app.js"))), "two");
+  assert.equal(
+    text(await fs.readFile(uri(vscode, "/Site/lib/lib/util.js"))),
+    "three",
+  );
+  await assert.rejects(fs.stat(uri(vscode, "/Site/src")), {
+    code: "FileNotFound",
+  });
+});
+
+test("rename refuses an occupied destination, and overwrite replaces it", async () => {
+  const { fs, vscode } = await provider({
+    "a.txt": "one",
+    "b.txt": "two",
+    "src/app.js": "new",
+    "lib/stale.js": "old",
+  });
+
+  await assert.rejects(
+    fs.rename(uri(vscode, "/Site/a.txt"), uri(vscode, "/Site/b.txt"), {
+      overwrite: false,
+    }),
+    { code: "FileExists" },
+  );
+
+  await fs.rename(uri(vscode, "/Site/a.txt"), uri(vscode, "/Site/b.txt"), {
+    overwrite: true,
+  });
+  assert.equal(text(await fs.readFile(uri(vscode, "/Site/b.txt"))), "one");
+
+  // Directories were the hole. getDirectoryHandle({ create: true }) succeeds on
+  // one that already exists, so a non-overwriting rename went through and an
+  // overwriting one merged the trees instead of replacing them.
+  await assert.rejects(
+    fs.rename(uri(vscode, "/Site/src"), uri(vscode, "/Site/lib"), {
+      overwrite: false,
+    }),
+    { code: "FileExists" },
+  );
+
+  await fs.rename(uri(vscode, "/Site/src"), uri(vscode, "/Site/lib"), {
+    overwrite: true,
+  });
+  assert.deepEqual(
+    (await fs.readDirectory(uri(vscode, "/Site/lib"))).map(([name]) => name),
+    ["app.js"],
+    "stale.js came from the folder that was replaced and should be gone",
+  );
 });
 
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-test('the registry is written under the same lock rfs.js uses', async () => {
-	const { internals, calls, opfs } = loadExtension();
+test("the registry is written under the same lock rfs.js uses", async () => {
+  const { internals, calls, opfs } = loadExtension();
 
-	await internals.updateRegistryEntry('Site', { encryptionType: null });
-	assert.ok(calls.locks.includes('rfs_registry_lock'));
+  await internals.updateRegistryEntry("Site", { encryptionType: null });
+  assert.ok(calls.locks.includes("rfs_registry_lock"));
 
-	const registry = await internals.readRegistry();
-	assert.equal(registry.Site.encryptionType, null);
-	assert.equal(typeof registry.Site.lastModified, 'number');
+  const registry = await internals.readRegistry();
+  assert.equal(registry.Site.encryptionType, null);
+  assert.equal(typeof registry.Site.lastModified, "number");
 
-	// A second write must merge, not replace: rfs.js keeps its own keys here.
-	await internals.updateRegistryEntry('Site', { headers: '* -> X: 1' });
-	const merged = await internals.readRegistry();
-	assert.equal(merged.Site.encryptionType, null);
-	assert.equal(merged.Site.headers, '* -> X: 1');
+  // A second write must merge, not replace: rfs.js keeps its own keys here.
+  await internals.updateRegistryEntry("Site", { headers: "* -> X: 1" });
+  const merged = await internals.readRegistry();
+  assert.equal(merged.Site.encryptionType, null);
+  assert.equal(merged.Site.headers, "* -> X: 1");
 
-	await internals.updateRegistryEntry('Site', null);
-	assert.deepEqual(await internals.readRegistry(), {});
-	assert.ok(opfs);
+  await internals.updateRegistryEntry("Site", null);
+  assert.deepEqual(await internals.readRegistry(), {});
+  assert.ok(opfs);
 });
 
-test('readRegistry survives a missing or corrupt rfs_system.json', async () => {
-	const { internals, opfs } = loadExtension();
+test("readRegistry survives a missing or corrupt rfs_system.json", async () => {
+  const { internals, opfs } = loadExtension();
 
-	assert.deepEqual(await internals.readRegistry(), {});
+  assert.deepEqual(await internals.readRegistry(), {});
 
-	const writable = await (await opfs.getFileHandle('rfs_system.json', { create: true })).createWritable();
-	await writable.write('{ this is not json');
-	await writable.close();
+  const writable = await (
+    await opfs.getFileHandle("rfs_system.json", { create: true })
+  ).createWritable();
+  await writable.write("{ this is not json");
+  await writable.close();
 
-	assert.deepEqual(await internals.readRegistry(), {});
+  assert.deepEqual(await internals.readRegistry(), {});
 });
 
-test('listFolders unions the registry with what is actually on disk', async () => {
-	const { internals, opfs } = loadExtension();
+// ---------------------------------------------------------------------------
+// Open RuntimeFS Folder
+// ---------------------------------------------------------------------------
 
-	await rfsFolder(opfs, 'OnDisk');
-	await internals.updateRegistryEntry('Registered', {});
-	await internals.updateRegistryEntry('OnDisk', {});
+/** The picker is created after listFolders() resolves, so let that settle. */
+async function openPicker(loaded) {
+  const pending = loaded.commands.get("runtimecode.openRfsFolder")();
+  await settle();
+  return { picker: loaded.quickPicks[0], pending };
+}
 
-	assert.deepEqual(await internals.listFolders(), ['OnDisk', 'Registered']);
+test("Open RuntimeFS Folder lists the folders with creating one pinned above them", async () => {
+  const opened = [];
+  const loaded = loadExtension({
+    hostCommands: {
+      "vscode.openFolder": async (folder) => {
+        opened.push(folder.toString());
+      },
+    },
+  });
+  for (const name of ["Alpha", "Beta"]) {
+    await rfsFolder(loaded.opfs, name);
+  }
+  loaded.exports.activate({ subscriptions: [] });
+
+  const { picker, pending } = await openPicker(loaded);
+
+  assert.equal(picker.shown, true);
+  assert.deepEqual(
+    picker.items.map((item) => item.label),
+    ["$(new-folder) New RuntimeFS Folder...", "", "Alpha", "Beta"],
+  );
+  assert.equal(picker.items[1].kind, loaded.vscode.QuickPickItemKind.Separator);
+  assert.equal(
+    picker.items[0].alwaysShow,
+    true,
+    "without alwaysShow the filter hides the create entry exactly when it is needed",
+  );
+
+  picker.accept(picker.items[2]);
+  await pending;
+
+  assert.deepEqual(opened, ["rfs:/Alpha"]);
+  assert.equal(picker.disposed, true);
+});
+
+test("typing a name that is not on the list turns the top entry into Create", async () => {
+  const opened = [];
+  const loaded = loadExtension({
+    hostCommands: {
+      "vscode.openFolder": async (folder) => {
+        opened.push(folder.toString());
+      },
+    },
+  });
+  await rfsFolder(loaded.opfs, "Alpha");
+  loaded.exports.activate({ subscriptions: [] });
+
+  const { picker, pending } = await openPicker(loaded);
+  picker.type("Site");
+  assert.equal(picker.createItem.label, '$(new-folder) Create "Site"');
+
+  picker.accept(picker.createItem);
+  await pending;
+
+  assert.deepEqual(await loaded.internals.listFolders(), ["Alpha", "Site"]);
+  assert.equal(
+    (await loaded.internals.readRegistry()).Site.encryptionType,
+    null,
+    "a folder RuntimeFS does not know about is one the user cannot serve",
+  );
+  assert.deepEqual(opened, ["rfs:/Site"]);
+});
+
+test("the create entry explains a name it cannot use, and accepting it does nothing", async () => {
+  const loaded = loadExtension({
+    hostCommands: { "vscode.openFolder": async () => {} },
+  });
+  await rfsFolder(loaded.opfs, "Alpha");
+  loaded.exports.activate({ subscriptions: [] });
+
+  const { picker, pending } = await openPicker(loaded);
+
+  picker.type("a/b");
+  assert.equal(picker.createItem.detail, "The name cannot contain slashes.");
+  picker.accept(picker.createItem);
+  await settle();
+  assert.equal(picker.shown, true, "a validated input box stays open too");
+
+  // An exact match is not a new folder, so the entry goes back to being the
+  // generic one and the folder itself is what there is to pick.
+  picker.type("Alpha");
+  assert.equal(
+    picker.createItem.label,
+    "$(new-folder) New RuntimeFS Folder...",
+  );
+  assert.equal(picker.createItem.detail, undefined);
+
+  picker.hide();
+  assert.equal(await pending, undefined);
+  assert.deepEqual(await loaded.internals.listFolders(), ["Alpha"]);
+});
+
+test("the generic create entry falls through to the validated input box", async () => {
+  const opened = [];
+  const loaded = loadExtension({
+    answers: { inputBox: "Fresh" },
+    hostCommands: {
+      "vscode.openFolder": async (folder) => {
+        opened.push(folder.toString());
+      },
+    },
+  });
+  loaded.exports.activate({ subscriptions: [] });
+
+  const { picker, pending } = await openPicker(loaded);
+  assert.match(picker.placeholder, /No RuntimeFS folders yet/);
+  assert.deepEqual(
+    picker.items.map((item) => item.label),
+    ["$(new-folder) New RuntimeFS Folder..."],
+    "with nothing to open, the picker is only there to create",
+  );
+
+  picker.accept(picker.createItem);
+  await pending;
+
+  const [kind, options] = loaded.calls.messages.at(-1);
+  assert.equal(kind, "inputBox");
+  assert.equal(options.title, "New RuntimeFS Folder");
+  assert.equal(
+    options.validateInput("a/b"),
+    "The name cannot contain slashes.",
+    "the picker and the input box have to agree about what a name may be",
+  );
+
+  assert.deepEqual(await loaded.internals.listFolders(), ["Fresh"]);
+  assert.deepEqual(opened, ["rfs:/Fresh"]);
+});
+
+test("folderNameProblem is the one place the rules live", () => {
+  const { internals } = loadExtension();
+  const problem = (name) => internals.folderNameProblem(name, ["Taken"]);
+
+  assert.equal(problem("Site"), undefined);
+  assert.match(problem(""), /required/);
+  assert.match(problem("a/b"), /slashes/);
+  assert.match(problem("a\\b"), /slashes/);
+  assert.match(problem("Taken"), /already exists/);
+});
+
+test("importing a folder registers it from the extension, not the bootstrap", async () => {
+  const invalidated = [];
+  const opened = [];
+  const { exports, commands, internals, calls } = loadExtension({
+    hostCommands: {
+      // The bootstrap copies the picked directory into OPFS and returns the name.
+      "runtimecode.internal.importRfsFolder": async () => "Imported",
+      "runtimecode.internal.invalidateRfsCache": async (folder) => {
+        invalidated.push(folder);
+        return true;
+      },
+      "vscode.openFolder": async (folder) => {
+        opened.push(folder.toString());
+      },
+    },
+  });
+  exports.activate({ subscriptions: [] });
+
+  await commands.get("runtimecode.importRfsFolder")();
+
+  const registry = await internals.readRegistry();
+  assert.deepEqual(
+    Object.keys(registry),
+    ["Imported"],
+    "updateRegistryEntry has to be the only thing in RuntimeCode writing rfs_system.json",
+  );
+  assert.equal(
+    registry.Imported.encryptionType,
+    null,
+    "rfs.js writes null for a plain imported folder",
+  );
+  assert.ok(calls.locks.includes("rfs_registry_lock"));
+  assert.deepEqual(invalidated, ["Imported"]);
+  assert.deepEqual(opened, ["rfs:/Imported"]);
+});
+
+test("listFolders unions the registry with what is actually on disk", async () => {
+  const { internals, opfs } = loadExtension();
+
+  await rfsFolder(opfs, "OnDisk");
+  await internals.updateRegistryEntry("Registered", {});
+  await internals.updateRegistryEntry("OnDisk", {});
+
+  assert.deepEqual(await internals.listFolders(), ["OnDisk", "Registered"]);
 });
 
 // ---------------------------------------------------------------------------
 // Preview
 // ---------------------------------------------------------------------------
 
-test('isPreviewable accepts what Dev Preview can render', () => {
-	const { internals, vscode } = loadExtension();
-	const can = (path) => internals.isPreviewable(uri(vscode, path));
+test("isPreviewable accepts what Dev Preview can render", () => {
+  const { internals, vscode } = loadExtension();
+  const can = (path) => internals.isPreviewable(uri(vscode, path));
 
-	assert.ok(can('/Site/index.html'));
-	assert.ok(can('/Site/page.htm'));
-	assert.ok(can('/Site/logo.svg'));
-	assert.ok(can('/Site/README.md'));
-	assert.ok(!can('/Site/app.js'));
-	assert.ok(!can('/Site/notes.txt'));
+  assert.ok(can("/Site/index.html"));
+  assert.ok(can("/Site/page.htm"));
+  assert.ok(can("/Site/logo.svg"));
+  assert.ok(can("/Site/README.md"));
+  assert.ok(!can("/Site/app.js"));
+  assert.ok(!can("/Site/notes.txt"));
 });
 
-test('previewUrlFor builds an encoded /n/ url', () => {
-	const { internals, vscode } = loadExtension();
+test("previewUrlFor builds an encoded /n/ url", () => {
+  const { internals, vscode } = loadExtension();
 
-	assert.equal(
-		internals.previewUrlFor('https://example.org/fs', uri(vscode, '/Site/index.html')),
-		'https://example.org/fs/n/Site/index.html');
-	assert.equal(
-		internals.previewUrlFor('https://example.org/fs', uri(vscode, '/My Site/a b.html')),
-		'https://example.org/fs/n/My%20Site/a%20b.html');
+  assert.equal(
+    internals.previewUrlFor(
+      "https://example.org/fs",
+      uri(vscode, "/Site/index.html"),
+    ),
+    "https://example.org/fs/n/Site/index.html",
+  );
+  assert.equal(
+    internals.previewUrlFor(
+      "https://example.org/fs",
+      uri(vscode, "/My Site/a b.html"),
+    ),
+    "https://example.org/fs/n/My%20Site/a%20b.html",
+  );
 });
 
-test('previewWrapperUrl carries the target, the inspector and the cache buster', () => {
-	const { internals } = loadExtension();
-	const base = 'https://example.org/fs/n/RC/';
-	const target = 'https://example.org/fs/n/Site/index.html';
+test("previewWrapperUrl carries the target, the inspector and the cache buster", () => {
+  const { internals } = loadExtension();
+  const base = "https://example.org/fs/n/RC/";
+  const target = "https://example.org/fs/n/Site/index.html";
 
-	const plain = new URL(internals.previewWrapperUrl(base, target, false));
-	assert.equal(plain.pathname, '/fs/n/RC/rc-preview.html');
-	assert.equal(plain.searchParams.get('target'), target);
-	assert.equal(plain.searchParams.get('inspector'), null);
-	assert.equal(plain.searchParams.get('__rc'), null);
+  const plain = new URL(internals.previewWrapperUrl(base, target, false));
+  assert.equal(plain.pathname, "/fs/n/RC/rc-preview.html");
+  assert.equal(plain.searchParams.get("target"), target);
+  assert.equal(plain.searchParams.get("inspector"), null);
+  assert.equal(plain.searchParams.get("__rc"), null);
 
-	const inspected = new URL(internals.previewWrapperUrl(base, target, true, true));
-	assert.equal(inspected.searchParams.get('inspector'), '1');
-	assert.ok(Number(inspected.searchParams.get('__rc')) > 0,
-		'without a cache buster the iframe replays whatever RuntimeFS cached');
+  const inspected = new URL(
+    internals.previewWrapperUrl(base, target, true, true),
+  );
+  assert.equal(inspected.searchParams.get("inspector"), "1");
+  assert.ok(
+    Number(inspected.searchParams.get("__rc")) > 0,
+    "without a cache buster the iframe replays whatever RuntimeFS cached",
+  );
 });
 
-test('Export Folder Locally offers the open folder first', async () => {
-	const { exports, vscode, commands, calls, opfs } = loadExtension();
-	for (const name of ['Alpha', 'Beta', 'Gamma']) { await rfsFolder(opfs, name); }
+test("Export Folder Locally offers the open folder first", async () => {
+  const { exports, vscode, commands, calls, opfs } = loadExtension();
+  for (const name of ["Alpha", "Beta", "Gamma"]) {
+    await rfsFolder(opfs, name);
+  }
 
-	vscode.workspace.workspaceFolders = [{ uri: vscode.Uri.from({ scheme: 'rfs', path: '/Beta' }) }];
-	exports.activate({ subscriptions: [] });
-	await commands.get('runtimecode.exportRfsFolder')();
+  vscode.workspace.workspaceFolders = [
+    { uri: vscode.Uri.from({ scheme: "rfs", path: "/Beta" }) },
+  ];
+  exports.activate({ subscriptions: [] });
+  await commands.get("runtimecode.exportRfsFolder")();
 
-	const [kind, items] = calls.messages.at(-1);
-	assert.equal(kind, 'quickPick');
-	// showQuickPick cannot preselect, so order is the only way to say "this one".
-	assert.deepEqual(items, ['Beta', 'Alpha', 'Gamma']);
+  const [kind, items] = calls.messages.at(-1);
+  assert.equal(kind, "quickPick");
+  // showQuickPick cannot preselect, so order is the only way to say "this one".
+  assert.deepEqual(items, ["Beta", "Alpha", "Gamma"]);
 });
 
-test('escapeHtml closes the attribute-injection hole in the preview panel', () => {
-	const { internals } = loadExtension();
+test("changing the inspector setting reaches an open preview", async () => {
+  const panels = [];
+  const {
+    exports,
+    vscode,
+    commands,
+    internals,
+    configuration,
+    listeners,
+    opfs,
+  } = loadExtension({
+    hostCommands: {
+      "runtimecode.internal.invalidateRfsCache": async () => true,
+      "runtimecode.internal.getRuntimeFsBase": async () =>
+        "https://example.org/fs",
+      "runtimecode.internal.getRuntimeCodeBase": async () =>
+        "https://example.org/fs/n/RC/",
+    },
+  });
+  await rfsFolder(opfs, "Site", { "index.html": "<h1>hi</h1>" });
+  // Already in place, or Dev Preview stops to ask for them instead of opening.
+  await internals.setSameOriginHeaders("Site", true);
+  vscode.workspace.workspaceFolders = [{ uri: uri(vscode, "/Site") }];
 
-	assert.equal(internals.escapeHtml('<img src="x" onerror=alert(1)>'),
-		'&lt;img src=&quot;x&quot; onerror=alert(1)&gt;');
-	assert.equal(internals.escapeHtml('a & b'), 'a &amp; b');
+  const createPanel = vscode.window.createWebviewPanel;
+  vscode.window.createWebviewPanel = (...args) => {
+    const panel = createPanel(...args);
+    panels.push(panel);
+    return panel;
+  };
+
+  exports.activate({ subscriptions: [] });
+  await commands.get("runtimecode.showPreview")();
+  assert.equal(panels.length, 1);
+  assert.match(panels[0].webview.html, /Inspector Off/);
+
+  // Through the Settings editor, not the command: the panel reads the setting
+  // in its constructor, so nothing reached it until the change was watched.
+  configuration.set("runtimecode.preview.inspector", true);
+  await fireConfigurationChange(listeners, "runtimecode.preview.inspector");
+
+  assert.match(panels[0].webview.html, /Inspector On/);
+});
+
+test("escapeHtml closes the attribute-injection hole in the preview panel", () => {
+  const { internals } = loadExtension();
+
+  assert.equal(
+    internals.escapeHtml('<img src="x" onerror=alert(1)>'),
+    "&lt;img src=&quot;x&quot; onerror=alert(1)&gt;",
+  );
+  assert.equal(internals.escapeHtml("a & b"), "a &amp; b");
 });
 
 // ---------------------------------------------------------------------------
 // Same-origin headers
 // ---------------------------------------------------------------------------
 
-test('hasSameOriginHeaders needs both COEP and COOP', () => {
-	const { internals } = loadExtension();
-	const { hasSameOriginHeaders } = internals;
+test("hasSameOriginHeaders needs both COEP and COOP", () => {
+  const { internals } = loadExtension();
+  const { hasSameOriginHeaders } = internals;
 
-	assert.ok(hasSameOriginHeaders(
-		'* -> Cross-Origin-Embedder-Policy: require-corp\n* -> Cross-Origin-Opener-Policy: same-origin'));
-	// Order, case and spacing are the user's business; RuntimeFS parses it loosely.
-	assert.ok(hasSameOriginHeaders(
-		'*  ->  cross-origin-opener-policy : same-origin\n*->Cross-Origin-Embedder-Policy:require-corp'));
+  assert.ok(
+    hasSameOriginHeaders(
+      "* -> Cross-Origin-Embedder-Policy: require-corp\n* -> Cross-Origin-Opener-Policy: same-origin",
+    ),
+  );
+  // Order, case and spacing are the user's business; RuntimeFS parses it loosely.
+  assert.ok(
+    hasSameOriginHeaders(
+      "*  ->  cross-origin-opener-policy : same-origin\n*->Cross-Origin-Embedder-Policy:require-corp",
+    ),
+  );
 
-	assert.ok(!hasSameOriginHeaders('* -> Cross-Origin-Embedder-Policy: require-corp'));
-	assert.ok(!hasSameOriginHeaders('* -> Cross-Origin-Embedder-Policy: credentialless\n* -> Cross-Origin-Opener-Policy: same-origin'));
-	assert.ok(!hasSameOriginHeaders(''));
-	assert.ok(!hasSameOriginHeaders(undefined));
+  assert.ok(
+    !hasSameOriginHeaders("* -> Cross-Origin-Embedder-Policy: require-corp"),
+  );
+  assert.ok(
+    !hasSameOriginHeaders(
+      "* -> Cross-Origin-Embedder-Policy: credentialless\n* -> Cross-Origin-Opener-Policy: same-origin",
+    ),
+  );
+  assert.ok(!hasSameOriginHeaders(""));
+  assert.ok(!hasSameOriginHeaders(undefined));
 });
 
-test('setSameOriginHeaders adds, removes, and never duplicates', async () => {
-	const invalidated = [];
-	const { internals } = loadExtension({
-		hostCommands: {
-			'runtimecode.internal.invalidateRfsCache': async (folder) => { invalidated.push(folder); return true; }
-		}
-	});
-	await internals.updateRegistryEntry('Site', { headers: '* -> X-Custom: keep-me' });
+test("setSameOriginHeaders adds, removes, and never duplicates", async () => {
+  const invalidated = [];
+  const { internals } = loadExtension({
+    hostCommands: {
+      "runtimecode.internal.invalidateRfsCache": async (folder) => {
+        invalidated.push(folder);
+        return true;
+      },
+    },
+  });
+  await internals.updateRegistryEntry("Site", {
+    headers: "* -> X-Custom: keep-me",
+  });
 
-	await internals.setSameOriginHeaders('Site', true);
-	await internals.setSameOriginHeaders('Site', true);
+  await internals.setSameOriginHeaders("Site", true);
+  await internals.setSameOriginHeaders("Site", true);
 
-	const headers = (await internals.readRegistry()).Site.headers;
-	assert.ok(internals.hasSameOriginHeaders(headers));
-	assert.equal(headers.split('\n').filter(line => /Embedder-Policy/.test(line)).length, 1,
-		're-enabling must not stack duplicate header lines in the folder');
-	assert.ok(headers.includes('* -> X-Custom: keep-me'), 'the user\'s own header lines have to survive');
+  const headers = (await internals.readRegistry()).Site.headers;
+  assert.ok(internals.hasSameOriginHeaders(headers));
+  assert.equal(
+    headers.split("\n").filter((line) => /Embedder-Policy/.test(line)).length,
+    1,
+    "re-enabling must not stack duplicate header lines in the folder",
+  );
+  assert.ok(
+    headers.includes("* -> X-Custom: keep-me"),
+    "the user's own header lines have to survive",
+  );
 
-	await internals.setSameOriginHeaders('Site', false);
-	const after = (await internals.readRegistry()).Site.headers;
-	assert.ok(!internals.hasSameOriginHeaders(after));
-	assert.equal(after, '* -> X-Custom: keep-me');
+  await internals.setSameOriginHeaders("Site", false);
+  const after = (await internals.readRegistry()).Site.headers;
+  assert.ok(!internals.hasSameOriginHeaders(after));
+  assert.equal(after, "* -> X-Custom: keep-me");
 
-	assert.deepEqual(invalidated, ['Site', 'Site', 'Site'],
-		'a header change only takes effect once RuntimeFS drops the cached responses');
+  assert.deepEqual(
+    invalidated,
+    ["Site", "Site", "Site"],
+    "a header change only takes effect once RuntimeFS drops the cached responses",
+  );
+});
+
+test("the settings write the commands make does not echo back as a second write", async () => {
+  const invalidated = [];
+  const {
+    exports,
+    vscode,
+    commands,
+    internals,
+    configuration,
+    listeners,
+    opfs,
+  } = loadExtension({
+    hostCommands: {
+      "runtimecode.internal.invalidateRfsCache": async (folder) => {
+        invalidated.push(folder);
+        return true;
+      },
+    },
+  });
+  await rfsFolder(opfs, "Site");
+  vscode.workspace.workspaceFolders = [{ uri: uri(vscode, "/Site") }];
+  exports.activate({ subscriptions: [] });
+
+  await commands.get("runtimecode.enableSameOrigin")();
+  await fireConfigurationChange(listeners, "runtimecode.sameOrigin.enabled");
+
+  assert.deepEqual(
+    invalidated,
+    ["Site"],
+    "the command writes the headers and the setting; the resulting change event must not write them again",
+  );
+  assert.ok(
+    internals.hasSameOriginHeaders(
+      (await internals.readRegistry()).Site.headers,
+    ),
+  );
+
+  // The same event with a value nobody applied is a real edit, and still lands.
+  configuration.set("runtimecode.sameOrigin.enabled", false);
+  await fireConfigurationChange(listeners, "runtimecode.sameOrigin.enabled");
+
+  assert.deepEqual(invalidated, ["Site", "Site"]);
+  assert.ok(
+    !internals.hasSameOriginHeaders(
+      (await internals.readRegistry()).Site.headers,
+    ),
+  );
 });

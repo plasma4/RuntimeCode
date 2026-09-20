@@ -37,8 +37,15 @@ import {
   DIST,
   RC_ROOT,
 } from "./lib.mjs";
+import {
+  collectExtensionLicenses,
+  NON_SHIPPING_ENTRIES,
+  renderExtensionNotices,
+  renderLicenseIndex,
+} from "./licenses.mjs";
 
 const WEBVIEW_SW_NAME = "rc-webview-sw.js";
+const EXTENSIONS_SRC = path.join(RC_ROOT, "extensions");
 
 const HOST_ROOT_README = `These files must sit at the RuntimeFS HOST ROOT, beside RuntimeFS's own
 index.html and sw.js. Not inside the RuntimeCode folder.
@@ -243,6 +250,78 @@ async function vendorEruda() {
 }
 
 /**
+ * RuntimeCode's own extensions ship alongside the workbench and are wired up as
+ * additionalBuiltinExtensions by the bootstrap. They are plain CommonJS with no
+ * build step, because the web extension host loads them with
+ * `new Function('module','exports','require', src)`.
+ *
+ * Copied folder by folder rather than as one `cpSync(extensions/)`, for two
+ * reasons. The obvious one is that `extensions/types/` holds the gitignored
+ * 728 KB `vscode.d.ts` that typecheck.mjs drops there, and a wholesale copy
+ * shipped it to every user along with whatever else happened to be sitting in
+ * the directory. The one that matters more is that this loop and the license
+ * gate agree on what an extension is: a folder with a manifest. A folder that
+ * cannot declare its terms cannot be shipped by accident.
+ */
+function copyExtensions(entries) {
+  const dest = path.join(APP_OUT, "rc-extensions");
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(dest, { recursive: true });
+
+  for (const entry of entries) {
+    cpSync(path.join(EXTENSIONS_SRC, entry.id), path.join(dest, entry.id), {
+      recursive: true,
+      filter: (src) => !NON_SHIPPING_ENTRIES.has(path.basename(src)),
+    });
+  }
+
+  writeFileSync(
+    path.join(dest, "LICENSES.md"),
+    `${renderLicenseIndex(entries).trimEnd()}\n`,
+  );
+  console.log(
+    `[staticify] copied rc-extensions/ (${entries.map((e) => e.id).join(", ") || "none"})`,
+  );
+}
+
+/**
+ * Attribution travels with the artifact.
+ *
+ * Upstream's `vscode-web` package step copies only `remote/LICENSE`, which does
+ * not exist, so a naive build redistributes VS Code, its bundled dependencies
+ * and its built-in extensions with no notice at all (`dist/app` shipped no
+ * license file before this). The upstream texts live at the checkout root and
+ * change with every release, so they are read from there at build time rather
+ * than duplicated into this repo, where they would go stale.
+ *
+ * `dist/app/LICENSE` is the MIT license of the workbench and everything in this
+ * repo that built it. It is deliberately not the license of `rc-extensions/*`,
+ * which each carry their own; the notices file says so, and points at them.
+ */
+function emitLicenses(entries) {
+  copyFileSync(path.join(RC_ROOT, "LICENSE"), path.join(APP_OUT, "LICENSE"));
+
+  const rule = "=".repeat(78);
+  const banner = (title) => `${rule}\n${title}\n${rule}`;
+  const parts = [
+    readFileSync(path.join(RC_ROOT, "THIRD_PARTY_NOTICES.md"), "utf8").trim(),
+    banner("RuntimeCode extensions (rc-extensions/)"),
+    "Each extension below is a separate work under its own license, aggregated\n" +
+      "with the workbench rather than combined into it. See rc-extensions/LICENSES.md.\n\n" +
+      renderExtensionNotices(entries),
+    banner("VS Code LICENSE.txt (upstream)"),
+    readFileSync(path.join(VSCODE_ROOT, "LICENSE.txt"), "utf8").trim(),
+    banner("VS Code ThirdPartyNotices.txt (upstream)"),
+    readFileSync(path.join(VSCODE_ROOT, "ThirdPartyNotices.txt"), "utf8").trim(),
+  ];
+  writeFileSync(
+    path.join(APP_OUT, "ThirdPartyNotices.txt"),
+    `${parts.join("\n\n")}\n`,
+  );
+  console.log("[staticify] emitted LICENSE and ThirdPartyNotices.txt");
+}
+
+/**
  * Move gulp's output into dist/app. A move, not a copy: every build rimrafs and
  * rewrites GULP_OUT anyway, so copying would just leave a stale half-gigabyte
  * sitting next to the checkout pretending to be a deliverable. renameSync is
@@ -267,6 +346,19 @@ async function main() {
   if (!existsSync(GULP_OUT)) {
     throw new Error(
       `No build output at ${GULP_OUT}. Run scripts/build.mjs first.`,
+    );
+  }
+
+  // Before anything is moved. collectGulpOutput rimrafs dist/ and renames half
+  // a gigabyte into it, so an extension missing its license should stop the
+  // build here rather than after the expensive part, leaving a dist/ that looks
+  // finished and is not shippable.
+  const { entries: extensions, problems } = collectExtensionLicenses(
+    EXTENSIONS_SRC,
+  );
+  if (problems.length > 0) {
+    throw new Error(
+      `Extensions cannot be shipped without stating their terms:\n\n  ${problems.join("\n\n  ")}\n`,
     );
   }
 
@@ -320,17 +412,8 @@ async function main() {
 
   rebrandWelcomeStrings(buildProductConfiguration().nameLong);
 
-  // RuntimeCode's own extensions ship alongside the workbench and are wired up
-  // as additionalBuiltinExtensions by the bootstrap. They are plain CommonJS
-  // with no build step, because the web extension host loads them with
-  // `new Function('module','exports','require', src)`.
-  const extensionsSrc = path.join(RC_ROOT, "extensions");
-  if (existsSync(extensionsSrc)) {
-    const dest = path.join(APP_OUT, "rc-extensions");
-    rmSync(dest, { recursive: true, force: true });
-    cpSync(extensionsSrc, dest, { recursive: true });
-    console.log("[staticify] copied rc-extensions/");
-  }
+  copyExtensions(extensions);
+  emitLicenses(extensions);
 
   await vendorEruda();
 

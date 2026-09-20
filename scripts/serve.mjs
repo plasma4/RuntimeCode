@@ -12,6 +12,9 @@
  * lives in production. Getting that wrong locally is how a missing host-root
  * deployment stays invisible until webviews break on the real site.
  *
+ * dist/ is also served at / as a fallback in every mode, so /app/ and
+ * /homepage/ address the build the way it sits on disk.
+ *
  * --simulate-rfs mimics RuntimeFS's virtual path layout without RuntimeFS, so
  * the live-preview URL derivation can be exercised locally. It does NOT
  * exercise RuntimeFS's service worker. Test that in a real deployment.
@@ -30,7 +33,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { RC_ROOT, RFS_ROOT, APP_OUT, HOST_OUT } from "./lib.mjs";
+import { RC_ROOT, RFS_ROOT, APP_OUT, HOST_OUT, DIST } from "./lib.mjs";
 
 const PORT = Number(process.env.PORT ?? 8099);
 const withRfs = process.argv.includes("--with-rfs");
@@ -113,6 +116,12 @@ createServer((req, res) => {
     file = resolveFile(HOST_OUT, req.url) ?? resolveFile(APP_OUT, req.url);
   }
 
+  // Last resort in every mode: dist/ itself, which makes /app/ and /homepage/
+  // resolve exactly as they sit on disk. The homepage links to the editor with
+  // a relative ../app/, so this is what lets that link be exercised locally
+  // without teaching the server a fourth layout.
+  file ??= resolveFile(DIST, req.url);
+
   if (!file) {
     res.writeHead(404, { "content-type": "text/plain" });
     res.end(`404 ${req.url}`);
@@ -153,4 +162,5 @@ createServer((req, res) => {
   } else {
     console.log(`[serve] app:       ${APP_OUT} -> /`);
   }
+  console.log(`[serve] dist:      ${DIST} -> / (so /app/ and /homepage/ work)`);
 });

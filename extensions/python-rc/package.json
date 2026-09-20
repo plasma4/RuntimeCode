@@ -1,0 +1,76 @@
+{
+	"name": "python-rc",
+	"displayName": "Python (scaffold)",
+	"description": "A minimal extension shell: commands, settings and UI surfaces. No Python yet.",
+	"version": "0.0.1",
+	"publisher": "runtimecode",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.137.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"browser": "./extension.js",
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "runtimecode.shell.hello",
+				"title": "Hello",
+				"category": "Runtime Shell"
+			},
+			{
+				"command": "runtimecode.shell.greet",
+				"title": "Greet...",
+				"category": "Runtime Shell"
+			},
+			{
+				"command": "runtimecode.shell.pickRuntime",
+				"title": "Pick a Runtime...",
+				"category": "Runtime Shell",
+				"icon": "$(beaker)"
+			},
+			{
+				"command": "runtimecode.shell.openPanel",
+				"title": "Open Panel",
+				"category": "Runtime Shell",
+				"icon": "$(open-preview)"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "runtimecode.shell.hello",
+				"key": "ctrl+alt+h",
+				"mac": "cmd+alt+h"
+			}
+		],
+		"configuration": {
+			"title": "Runtime Shell",
+			"properties": {
+				"runtimecode.shell.greeting": {
+					"type": "string",
+					"default": "world",
+					"description": "The name the Hello command greets."
+				}
+			}
+		},
+		"menus": {
+			"editor/title": [
+				{
+					"command": "runtimecode.shell.openPanel",
+					"when": "resourceScheme == rfs",
+					"group": "navigation"
+				}
+			]
+		}
+	}
+}

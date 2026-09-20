@@ -30,6 +30,15 @@ import {
  * ("Protected fields have been made PUBLIC"), which has nothing to do with our
  * changes and cannot be worked around from here.
  */
+function knowsTag(tag) {
+  return (
+    execFileSync("git", ["tag", "-l", tag], {
+      cwd: VSCODE_ROOT,
+      encoding: "utf8",
+    }).trim() === tag
+  );
+}
+
 function checkoutPin() {
   const pin = readFileSync(path.join(RC_ROOT, "vscode.pin"), "utf8").trim();
 
@@ -48,6 +57,23 @@ function checkoutPin() {
     console.log(`[prepare] already on ${pin}`);
     return;
   }
+
+  // A pin edited by hand names a tag the checkout may never have fetched, and
+  // `git checkout` then fails with "pathspec ... did not match any file(s)",
+  // which reads like the tag does not exist rather than like it was never
+  // downloaded. upgrade.mjs fetches for this reason; prepare has to as well,
+  // because it is also run on its own.
+  if (!knowsTag(pin)) {
+    console.log(`[prepare] ${pin} is not in the checkout yet, fetching tags`);
+    run("git", ["fetch", "--tags"], { cwd: VSCODE_ROOT });
+    if (!knowsTag(pin)) {
+      throw new Error(
+        `No upstream tag ${pin}, even after fetching. Check vscode.pin: ` +
+          `either the release is not out yet, or the name is wrong.`,
+      );
+    }
+  }
+
   console.log(`[prepare] checking out ${pin} (was ${current})`);
   run("git", ["checkout", pin], { cwd: VSCODE_ROOT });
   console.log(

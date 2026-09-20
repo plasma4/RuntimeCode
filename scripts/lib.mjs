@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,6 +38,14 @@ export const APP_OUT = path.join(DIST, "app");
  * service workers, so a copy living only in the virtual tree can never load.
  */
 export const HOST_OUT = path.join(DIST, "host-root");
+/**
+ * The marketing site, and the one part of this repo that is not MIT. It is
+ * AGPL-3.0, it is a separate artifact, and it is deployed to a different place
+ * than the editor. Keeping it as a sibling of APP_OUT rather than a folder
+ * inside it is what makes "the homepage's license does not reach the editor" a
+ * fact about the filesystem instead of a promise in a README.
+ */
+export const HOMEPAGE_OUT = path.join(DIST, "homepage");
 
 /** Node version the vscode checkout pins in .nvmrc. Anything else breaks node-gyp or the build. */
 export function requiredNodeVersion() {
@@ -191,6 +199,64 @@ export function rebrandNlsMessages(keys, messages, productName) {
     );
   }
   return out;
+}
+
+/**
+ * Refuses to build a checkout that prepare.mjs has not been run against.
+ *
+ * This exists because the failure it catches is silent and expensive. A `git
+ * reset --hard` or a `git checkout` in the vscode tree removes the entire
+ * divergence, and nothing downstream notices: gulp builds, staticify runs,
+ * check-endpoints passes, and `dist/` looks completely normal. What ships is an
+ * unpatched workbench — webviews blank because patch 0003 is gone, the Welcome
+ * page missing its RuntimeFS entries because patch 0004 is gone — and the only
+ * way to find out is to load it and look.
+ *
+ * Branding is not a usable signal here, because staticify merges the product
+ * overlay itself at package time, so an unprepared build is still called
+ * RuntimeCode. The patches are the real test, and `git apply --reverse --check`
+ * answers it exactly: it succeeds only if the patch is already applied.
+ */
+export function assertPrepared() {
+  const problems = [];
+
+  const overlay = JSON.parse(
+    readFileSync(path.join(RC_ROOT, "product.overlay.json"), "utf8"),
+  );
+  const product = JSON.parse(
+    readFileSync(path.join(VSCODE_ROOT, "product.json"), "utf8"),
+  );
+  if (overlay.nameLong && product.nameLong !== overlay.nameLong) {
+    problems.push(
+      `product.json still reads nameLong "${product.nameLong}", not "${overlay.nameLong}"`,
+    );
+  }
+
+  const patchDir = path.join(RC_ROOT, "patches");
+  const patches = existsSync(patchDir)
+    ? readdirSync(patchDir)
+        .filter((file) => file.endsWith(".patch"))
+        .sort()
+    : [];
+  for (const patch of patches) {
+    const applied = spawnSync(
+      "git",
+      ["apply", "--reverse", "--check", path.join(patchDir, patch)],
+      { cwd: VSCODE_ROOT, stdio: "ignore" },
+    );
+    if (applied.status !== 0) {
+      problems.push(`patches/${patch} is not applied`);
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `${VSCODE_ROOT} is not prepared:\n  ${problems.join("\n  ")}\n\n` +
+        `Run:  node scripts/prepare.mjs\n\n` +
+        `Building anyway produces a dist/ that looks right and is missing the\n` +
+        `divergence: blank webviews, no RuntimeFS entries on the Welcome page.`,
+    );
+  }
 }
 
 export function assertVscodeCheckout() {

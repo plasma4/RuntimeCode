@@ -1,0 +1,47 @@
+Annotate a self-referential test local so the build typechecks.
+
+Three tests in codexProviderConfiguration.test.ts build a TestConfigurationClient
+whose callbacks read `client.readCount` off the very binding being initialised.
+TypeScript cannot infer a type through that cycle and fails the whole
+compile-build task with six errors, all of the form "'client' implicitly has type
+'any' because it does not have a type annotation and is referenced directly or
+indirectly in its own initializer".
+
+An explicit annotation breaks the cycle and changes nothing at runtime. The file
+is a node-side test for the Codex agent host and is not part of the web bundle,
+but `compile-build-without-mangling` typechecks all of src/, so it blocks this
+build like any other error.
+
+Present at 1.138.0. Expect to drop this patch once upstream fixes it; it is the
+same kind of tax as 0001.
+diff --git a/src/vs/platform/agentHost/test/node/codex/codexProviderConfiguration.test.ts b/src/vs/platform/agentHost/test/node/codex/codexProviderConfiguration.test.ts
+index ea0716dbb14..1721244271a 100644
+--- a/src/vs/platform/agentHost/test/node/codex/codexProviderConfiguration.test.ts
++++ b/src/vs/platform/agentHost/test/node/codex/codexProviderConfiguration.test.ts
+@@ -135,7 +135,7 @@ suite('CodexProviderConfiguration', () => {
+ 	}
+ 
+ 	test('rereads the user configuration on a version conflict', async () => {
+-		const client = new TestConfigurationClient(() => userConfiguration({ personality: 'pragmatic' }, `version-${client.readCount}`), () => {
++		const client: TestConfigurationClient = new TestConfigurationClient(() => userConfiguration({ personality: 'pragmatic' }, `version-${client.readCount}`), () => {
+ 			if (client.writes.length === 1) {
+ 				throw new JsonRpcError(-32600, 'Changed concurrently', { config_write_error_code: 'configVersionConflict' });
+ 			}
+@@ -145,7 +145,7 @@ suite('CodexProviderConfiguration', () => {
+ 	});
+ 
+ 	test('preserves an alias installed concurrently by another client', async () => {
+-		const client = new TestConfigurationClient(() => userConfiguration(client.readCount === 1 ? {} : { model_providers: { 'vscode-proxy': portableProvider } }), () => {
++		const client: TestConfigurationClient = new TestConfigurationClient(() => userConfiguration(client.readCount === 1 ? {} : { model_providers: { 'vscode-proxy': portableProvider } }), () => {
+ 			throw new JsonRpcError(-32600, 'Changed concurrently', { config_write_error_code: 'configVersionConflict' });
+ 		});
+ 		await ensurePortableCodexProxyProvider(client);
+@@ -153,7 +153,7 @@ suite('CodexProviderConfiguration', () => {
+ 	});
+ 
+ 	test('does not overwrite a conflicting alias introduced by a concurrent edit', async () => {
+-		const client = new TestConfigurationClient(() => userConfiguration(client.readCount === 1 ? {} : { model_providers: { 'vscode-proxy': { name: 'User provider', env_key: 'CUSTOM_TOKEN' } } }), () => {
++		const client: TestConfigurationClient = new TestConfigurationClient(() => userConfiguration(client.readCount === 1 ? {} : { model_providers: { 'vscode-proxy': { name: 'User provider', env_key: 'CUSTOM_TOKEN' } } }), () => {
+ 			throw new JsonRpcError(-32600, 'Changed concurrently', { config_write_error_code: 'configVersionConflict' });
+ 		});
+ 		await assert.rejects(ensurePortableCodexProxyProvider(client), /already defines an incompatible/);

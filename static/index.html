@@ -107,11 +107,14 @@
 			}
 		};
 
-		// The RuntimeFS extension ships beside the workbench and is registered as a
-		// built-in. The URI has to be built at runtime because the folder can be
-		// served from any path, including /n/<Folder>/ inside RuntimeFS itself.
+		// Our extensions ship beside the workbench and are registered as built-ins.
+		// The URIs have to be built at runtime because the folder can be served
+		// from any path, including /n/<Folder>/ inside RuntimeFS itself.
 		const runtimefsExtension = URI.parse(
 			new URL('./rc-extensions/runtimefs/', window.location.href).toString()
+		);
+		const pythonRfsExtension = URI.parse(
+			new URL('./rc-extensions/python-rc/', window.location.href).toString()
 		);
 
 		/**
@@ -270,7 +273,7 @@
 			...config,
 			webviewEndpoint,
 			workspaceProvider,
-			additionalBuiltinExtensions: [runtimefsExtension],
+			additionalBuiltinExtensions: [runtimefsExtension, pythonRfsExtension],
 			// Handlers are functions, so these cannot live in the JSON config.
 			commands: [
 				{ id: 'runtimecode.internal.invalidateRfsCache', handler: invalidateRfsCache },

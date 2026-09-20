@@ -21,6 +21,7 @@ const TYPES_DIR = path.join(RC_ROOT, "extensions", "types");
 // find a jsconfig.json, even though it reads one happily when given the path.
 const PROJECTS = [
   path.join(RC_ROOT, "extensions", "runtimefs", "jsconfig.json"),
+  path.join(RC_ROOT, "extensions", "python-rc", "jsconfig.json"),
 ];
 
 assertVscodeCheckout();

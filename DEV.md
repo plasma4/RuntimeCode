@@ -8,8 +8,10 @@ built.
 ```sh
 nvm use 24.18.0                        # the version in ../vscode/.nvmrc
 node scripts/prepare.mjs               # overlay/, product.overlay.json, patches/
-node scripts/build.mjs                 # gulp + staticify + endpoint gate  (--min to minify, --full to recompile)
-node scripts/serve.mjs                 # http://127.0.0.1:8099
+node scripts/build.mjs                 # gulp + staticify + homepage + the two gates  (--min to minify, --full to recompile)
+node scripts/homepage.mjs              # just the landing page; needs no vscode checkout
+node scripts/check-licenses.mjs        # every extension states its terms, and AGPL stays out of app/
+node scripts/serve.mjs                 # http://127.0.0.1:8099  (also /app/ and /homepage/)
 node scripts/serve.mjs --simulate-rfs  # the same build under /n/RuntimeCode/, fixtures at /n/<name>/
 node scripts/serve.mjs --coi           # ...plus COOP+COEP, for measuring cross-origin isolation
 node --test test/                      # the RuntimeFS extension and the build helpers
@@ -20,7 +22,37 @@ node scripts/check-deploy.mjs https://example.org/projects/RuntimeFS/n/RC/
 
 Changing `extensions/`, `static/` or `scripts/`? `build.mjs` is enough, and a
 warm one takes about half a minute. Changing `product.overlay.json`, `overlay/`
-or `patches/`? Run `prepare.mjs` first, and expect a longer build.
+or `patches/`? Run `prepare.mjs` first, and expect a longer build. Changing
+`homepage/`? `homepage.mjs` alone, which is instant and does not read the
+checkout at all.
+
+`build.mjs` refuses to start if the checkout is not prepared. Anything that
+resets the vscode tree — a `git reset --hard`, a tag checkout, an interrupted
+upgrade — silently drops the whole divergence, and every downstream step keeps
+working: gulp builds, staticify rebrands from `product.overlay.json` on its own,
+the endpoint gate passes, and `dist/` looks finished. What it actually contains
+is an unpatched workbench with blank webviews and no RuntimeFS entries on the
+Welcome page. The check is `git apply --reverse --check` per patch, which
+succeeds only when the patch is already in the tree.
+
+## Adding an extension
+
+A directory under `extensions/` with a `package.json` is an extension, and the
+build treats it as one. It needs two things it will not build without:
+
+- a `"license"` field holding an SPDX id, and
+- a `LICENSE` file beside the code.
+
+A GPL or AGPL extension also needs `"runtimecode": { "source": ... }` in its
+manifest, naming either the exact upstream revision the shipped binary was built
+from or `"in-tree"` when the folder is the complete corresponding source. See
+the Licensing section in [README.md](README.md) for why the boundary is drawn at
+the folder.
+
+Register it in `static/index.html` as an `additionalBuiltinExtensions` entry and
+add its `jsconfig.json` to `PROJECTS` in `scripts/typecheck.mjs`. Everything
+else — the copy into `rc-extensions/`, the license index, the notices — is
+generated.
 
 `--coi` is the only thing `serve.mjs` will ever inject a header for. Cross-origin
 isolation comes from the document's response headers, which in production are
@@ -72,5 +104,6 @@ and runs `tsc` from the checkout. Until it has run once, the editor cannot
 resolve `require('vscode')` and reports a few hundred errors in one file.
 
 There are no npm scripts, because this repo has no dependencies of its own. Both
-halves of `dist/` have to be uploaded on every deploy; see the deploy table in
-[README.md](README.md).
+halves of the editor in `dist/` have to be uploaded on every deploy, and
+`dist/homepage/` is a third, independent artifact under a different license; see
+the deploy table in [README.md](README.md).

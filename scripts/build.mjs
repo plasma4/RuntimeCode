@@ -14,6 +14,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+  assertPrepared,
   assertVscodeCheckout,
   requiredNodeVersion,
   run,
@@ -60,6 +61,7 @@ function haveWarmCompile() {
 }
 
 assertVscodeCheckout();
+assertPrepared();
 checkNode();
 
 // Go through the repo's own `gulp` script rather than `npx gulp`: it sets
@@ -94,7 +96,10 @@ if (full || !haveWarmCompile()) {
 }
 gulp(minified ? "vscode-web-min-ci" : "vscode-web-ci");
 run("node", [path.join(RC_ROOT, "scripts", "staticify.mjs")]);
+// After staticify, which rimrafs dist/ before it moves gulp's output in.
+run("node", [path.join(RC_ROOT, "scripts", "homepage.mjs")]);
 run("node", [path.join(RC_ROOT, "scripts", "check-endpoints.mjs")]);
+run("node", [path.join(RC_ROOT, "scripts", "check-licenses.mjs")]);
 
 console.log(
   `[build] done in ${Math.round((Date.now() - started) / 1000)}s -> ${DIST}`,

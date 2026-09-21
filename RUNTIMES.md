@@ -4,13 +4,16 @@ A plan for running code inside RuntimeCode: WebAssembly interpreters and
 compilers, shipped as optional **runtime packs**, with more than one pack per
 language where the trade-offs really differ.
 
-The runtime host exists: `extensions/runtime-host/` discovers runtime packs,
-owns the Run command and the terminal, and is covered by `test/runtimehost.test.mjs`
-against a fake provider. No pack is built yet; the host is inert with nothing to
-load, which is exactly what M1 is for. This file exists so the constraints are
-written down before the rest of the code is, because most of them are only
-discoverable by reading upstream or by watching something fail silently in a
-browser.
+The host and the first pack exist. `extensions/runtime-host/` discovers runtime
+packs, owns the Run command and the terminal, and `extensions/lua-wasmoon/`
+provides Lua 5.4 through wasmoon, its two assets vendored with digests in
+`pack.json`. Both are covered by tests that load the real extension the way the
+web host does and run the real Lua VM (`test/runtimehost.test.mjs`,
+`test/luapack.test.mjs`). What no test here can show is the two of them inside a
+built editor; that still needs a build machine. This file exists so the
+constraints are written down before the rest of the code is, because most of
+them are only discoverable by reading upstream or by watching something fail
+silently in a browser.
 
 ## What we are actually building
 
@@ -148,13 +151,19 @@ each inventing an arrangement.
 
 | Site                                                                         | Threads | SAB            | DOM and canvas | Cost to build | Notes                                                                                                               |
 | ---------------------------------------------------------------------------- | ------- | -------------- | -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `worker`, a nested worker from the extension host                            | no      | with isolation | no             | low           | The default. Classic script only. Dies with the extension host.                                                     |
+| `host`, the extension host worker itself                                      | no      | no             | no             | lowest        | No nested worker; the extension host is already a worker with no DOM. Used by the Lua pack.                        |
+| `worker`, a nested worker from the extension host                            | no      | with isolation | no             | low           | The default for packs that want their own thread. Classic script only. Dies with the extension host.                |
 | `webview`, hidden or visible                                                 | yes     | with isolation | yes            | medium        | The only site that can spawn workers. Needed for graphics and pthreads. Webviews are same-origin here (patch 0003). |
 | `window`, a worker owned by the bootstrap and exposed as an embedder command | yes     | with isolation | no             | medium        | Adds divergence in `static/index.html`.                                                                             |
 
-Start with `worker`. Add `webview` when the first pack needs threads or a
-plotting surface, such as matplotlib or SDL. Treat `window` as the fallback,
-because every line in `static/index.html` is a line we carry across upgrades.
+`host` is where a pack starts when the guest needs neither threads nor DOM: it
+saves the nested-worker bootstrap entirely, and the sandbox boundary is still
+the wasm module plus the mount table. `worker` is the step up when a guest
+should be sealed off from the extension host's globals, which is the reason to
+prefer it once a pack's assets come from somewhere less trusted. `webview` comes
+when the first pack needs threads or a plotting surface, such as matplotlib or
+SDL. `window` is the fallback, because every line in `static/index.html` is a
+line we carry across upgrades.
 
 ## The provider contract
 
@@ -290,7 +299,7 @@ pack build. Record each pack's license before it ships.
 | JavaScript | worker `eval`, ~0 MB                 | QuickJS-ng wasm, ~1 MB                      | The quick tier is the host engine: instant, but host semantics and host globals. QuickJS is isolated and deterministic. TypeScript needs a transform; Sucrase is small, `esbuild-wasm` (~9 MB) is exact. |
 | C          | tcc compiled to wasm, ~1 MB          | clang with the wasi-sdk sysroot, ~40-100 MB | The clearest pair in the list. Near-instant C99 against a thin libc, or a real toolchain that builds most single-file C and C++.                                                                         |
 | Ruby       | ruby.wasm, ~10-30 MB                 |                                             | One credible option. Ship it as quick and leave the tier open.                                                                                                                                           |
-| Lua        | wasmoon, ~0.5 MB                     |                                             | Cheap, and a good first pack for proving the contract end to end.                                                                                                                                        |
+| Lua        | wasmoon, ~0.5 MB                     |                                             | Shipped in-tree as `extensions/lua-wasmoon` (site `host`, stdin `none`). The official VM, cheap, and a good first pack for proving the contract end to end.                                               |
 | PHP        | php-wasm, ~10 MB                     |                                             | Mature lineage, from WordPress Playground.                                                                                                                                                               |
 | SQL        | SQLite wasm with the OPFS VFS, ~1 MB |                                             | Not a program runtime, but valuable and a natural fit for the mount model.                                                                                                                               |
 
@@ -423,7 +432,7 @@ A new pack is not done until it has a conformance row.
 |     | Deliverable                                                                                 | Done when                                                                                                         |
 | --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | M0  | The six spikes                                                                              | Findings written into this file, architecture confirmed or changed                                                |
-| M1  | `extensions/runtime-host/` and one tiny pack (Lua or QuickJS), built in-tree                | A file runs, output lands in a pseudoterminal, non-zero exit codes propagate                                      |
+| M1  | `extensions/runtime-host/` and one tiny pack (Lua or QuickJS), built in-tree                                | A file runs, output lands in a pseudoterminal, non-zero exit codes propagate. Built: the host and `extensions/lua-wasmoon/`; verified in Node, pending a built editor. |
 | M2  | `scripts/packs.mjs`, the catalog, install and uninstall and cleanup, bootstrap registration | A pack installs from the packs folder, survives a reload, uninstalls cleanly                                      |
 | M3  | Python quick tier, the mount table, the stdin tiers                                         | A script reads and writes workspace files; `input()` works under isolation and degrades with a message without it |
 | M4  | A second tier for one language, plus the conformance and benchmark harness                  | Two Python runtimes, one table comparing them, a picker that explains the difference                              |

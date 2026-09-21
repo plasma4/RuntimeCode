@@ -1,0 +1,30 @@
+{
+	"_comment": [
+		"Vendoring record for the wasmoon assets, and the seed of the pack pipeline",
+		"RUNTIMES.md M2 describes. scripts/packs.mjs will generate this from the",
+		"upstream tarball; until then the assets are copied by hand and this file",
+		"is what test/luapack.test.mjs checks them against. Refresh procedure is in",
+		"README.md beside this file."
+	],
+	"id": "lua.wasmoon",
+	"version": "1.16.0",
+	"license": "MIT",
+	"upstream": {
+		"package": "wasmoon",
+		"version": "1.16.0",
+		"tarball": "https://registry.npmjs.org/wasmoon/-/wasmoon-1.16.0.tgz"
+	},
+	"assets": [
+		{
+			"path": "assets/wasmoon-1.16.0.js",
+			"from": "package/dist/index.js",
+			"sha256": "dc2dcf019449008bb224370052473dc760db28b3ba14fc604e1ca3e8646af35d"
+		},
+		{
+			"path": "assets/glue-1.16.0.wasm",
+			"from": "package/dist/glue.wasm",
+			"sha256": "95f3f19ddb740125883bc41d5ec670cd0828e7b58c8bdad385323cbff497b55c"
+		}
+	],
+	"installBytes": 423233
+}

@@ -23,6 +23,7 @@ const PROJECTS = [
   path.join(RC_ROOT, "extensions", "runtimefs", "jsconfig.json"),
   path.join(RC_ROOT, "extensions", "python-rc", "jsconfig.json"),
   path.join(RC_ROOT, "extensions", "runtime-host", "jsconfig.json"),
+  path.join(RC_ROOT, "extensions", "lua-wasmoon", "jsconfig.json"),
 ];
 
 assertVscodeCheckout();

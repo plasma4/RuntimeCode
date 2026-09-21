@@ -111,6 +111,9 @@
 		const runtimeHostExtension = URI.parse(
 			new URL('./rc-extensions/runtime-host/', window.location.href).toString()
 		);
+		const luaWasmoonExtension = URI.parse(
+			new URL('./rc-extensions/lua-wasmoon/', window.location.href).toString()
+		);
 
 		/**
 		 * RuntimeFS's service worker caches per folder, so a preview tab keeps
@@ -315,6 +318,7 @@
 				runtimefsExtension,
 				pythonRfsExtension,
 				runtimeHostExtension,
+				luaWasmoonExtension,
 				...installedPacks.map((url) => URI.parse(url))
 			],
 			// Handlers are functions, so these cannot live in the JSON config.

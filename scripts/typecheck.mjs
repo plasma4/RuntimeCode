@@ -22,6 +22,7 @@ const TYPES_DIR = path.join(RC_ROOT, "extensions", "types");
 const PROJECTS = [
   path.join(RC_ROOT, "extensions", "runtimefs", "jsconfig.json"),
   path.join(RC_ROOT, "extensions", "python-rc", "jsconfig.json"),
+  path.join(RC_ROOT, "extensions", "runtime-host", "jsconfig.json"),
 ];
 
 assertVscodeCheckout();

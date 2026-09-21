@@ -1,0 +1,87 @@
+{
+	"name": "runtime-host",
+	"displayName": "Runtime Host",
+	"description": "Runs workspace files in installed language runtime packs.",
+	"version": "0.0.1",
+	"publisher": "runtimecode",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.137.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"browser": "./extension.js",
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "runtimecode.run",
+				"title": "Run File",
+				"category": "RuntimeCode",
+				"icon": "$(play)"
+			},
+			{
+				"command": "runtimecode.pickRuntime",
+				"title": "Select Runtime...",
+				"category": "RuntimeCode"
+			},
+			{
+				"command": "runtimecode.showRuntimes",
+				"title": "Show Installed Runtimes",
+				"category": "RuntimeCode"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "runtimecode.run",
+				"key": "ctrl+alt+r",
+				"mac": "cmd+alt+r"
+			}
+		],
+		"configuration": {
+			"title": "Runtime Host",
+			"properties": {
+				"runtimecode.runtime.default": {
+					"type": "string",
+					"default": "",
+					"description": "Runtime id to run without asking. Empty picks the last runtime used for the file's language, or asks."
+				},
+				"runtimecode.runtime.saveBeforeRun": {
+					"type": "boolean",
+					"default": true,
+					"description": "Save dirty editors before running. Off means a runtime may read the last saved version of the file."
+				},
+				"runtimecode.runtime.installThresholdBytes": {
+					"type": "number",
+					"default": 52428800,
+					"description": "Warn before installing a runtime larger than this many bytes. 0 disables the warning."
+				}
+			}
+		},
+		"menus": {
+			"editor/title/run": [
+				{
+					"command": "runtimecode.run",
+					"when": "resourceScheme == rfs",
+					"group": "navigation@1"
+				}
+			],
+			"editor/context": [
+				{
+					"command": "runtimecode.run",
+					"when": "resourceScheme == rfs",
+					"group": "navigation@1"
+				}
+			]
+		}
+	}
+}

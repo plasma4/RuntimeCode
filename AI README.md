@@ -51,6 +51,7 @@ is an input and it is enormous. It defaults to `../vscode`; set
 | `static/`                | Our bootstrap `index.html` and the Dev Preview host page                                           |
 | `homepage/`              | The landing page. AGPL-3.0, the only non-MIT folder here; builds separately                        |
 | `extensions/runtimefs/`  | The web extension providing the `rfs:` filesystem                                                  |
+| `extensions/runtime-host/` | The runtime host: registry, Run command, pseudoterminal. Loads a pack only when a runtime is chosen |
 | `extensions/python-rc/`  | Runtime-pack scaffold: commands, settings and UI surfaces, no Python yet                           |
 | `scripts/`               | prepare, build, staticify, homepage, check-endpoints, check-licenses, check-deploy, upgrade, serve |
 | `fixtures/`              | Sample project served at `/n/<name>/` by `serve.mjs --simulate-rfs`                                |

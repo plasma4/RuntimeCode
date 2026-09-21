@@ -19,14 +19,18 @@ const RC_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const EXTENSION = path.join(RC_ROOT, "extensions", "runtimefs", "extension.js");
+const DEFAULT_EXTENSION_DIR = path.join(RC_ROOT, "extensions", "runtimefs");
 
 export const MANIFEST = JSON.parse(
-  readFileSync(
-    path.join(RC_ROOT, "extensions", "runtimefs", "package.json"),
-    "utf8",
-  ),
+  readFileSync(path.join(DEFAULT_EXTENSION_DIR, "package.json"), "utf8"),
 );
+
+/** The manifest of any extension, for tests that read contributed fields. */
+export function readManifest(extensionDir) {
+  return JSON.parse(
+    readFileSync(path.join(RC_ROOT, "extensions", extensionDir, "package.json"), "utf8"),
+  );
+}
 
 /**
  * Internals the tests reach for. The epilogue runs inside the extension's own
@@ -243,6 +247,10 @@ class FakeEventEmitter {
       listener(value);
     }
   }
+
+  dispose() {
+    this.listeners = [];
+  }
 }
 
 /**
@@ -326,11 +334,19 @@ function fsError(code) {
  *   window API that asks the question.
  */
 export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
-  const calls = { executed: [], messages: [], locks: [], configUpdates: [] };
+  const calls = {
+    executed: [],
+    messages: [],
+    locks: [],
+    configUpdates: [],
+    terminals: [],
+  };
   const quickPicks = [];
+  const statusItems = [];
+  const outputChannels = [];
   const commands = new Map();
   const configuration = new Map();
-  const listeners = { configuration: [], save: [] };
+  const listeners = { configuration: [], save: [], extensions: [] };
   // A mutable box rather than a getter, so tests can destructure the result
   // before activate() has run and still see the registration afterwards.
   const registered = { fileSystemProvider: undefined };
@@ -347,6 +363,7 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
     FileChangeType: { Changed: 1, Created: 2, Deleted: 3 },
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     ViewColumn: { Active: -1, Beside: -2, One: 1 },
+    StatusBarAlignment: { Left: 1, Right: 2 },
     QuickPickItemKind: { Separator: -1, Default: 0 },
     FileSystemError: {
       FileNotFound: fsError("FileNotFound"),
@@ -377,16 +394,16 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
         calls.messages.push(["info", message]);
         return answers.information;
       },
-      async showWarningMessage(message) {
-        calls.messages.push(["warning", message]);
+      async showWarningMessage(message, ...actions) {
+        calls.messages.push(["warning", message, ...actions]);
         return answers.warning;
       },
       async showErrorMessage(message) {
         calls.messages.push(["error", message]);
         return answers.error;
       },
-      async showQuickPick(items) {
-        calls.messages.push(["quickPick", items]);
+      async showQuickPick(items, options) {
+        calls.messages.push(["quickPick", items, options]);
         return answers.quickPick;
       },
       async showInputBox(options) {
@@ -406,10 +423,83 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
           reveal() {},
         };
       },
+      createStatusBarItem() {
+        const item = {
+          text: "",
+          name: "",
+          tooltip: "",
+          command: undefined,
+          visible: false,
+          disposed: false,
+          show() {
+            item.visible = true;
+          },
+          hide() {
+            item.visible = false;
+          },
+          dispose() {
+            item.disposed = true;
+          },
+        };
+        statusItems.push(item);
+        return item;
+      },
+      createOutputChannel(name) {
+        const channel = {
+          name,
+          lines: [],
+          shown: false,
+          disposed: false,
+          append(text) {
+            channel.lines.push(...String(text).split("\n").filter(Boolean));
+          },
+          appendLine(text) {
+            channel.lines.push(String(text));
+          },
+          show() {
+            channel.shown = true;
+          },
+          hide() {},
+          clear() {
+            channel.lines = [];
+          },
+          dispose() {
+            channel.disposed = true;
+          },
+        };
+        outputChannels.push(channel);
+        return channel;
+      },
+      /**
+       * Records the terminal so a test can drive its pty. `open()` is not called
+       * here: VS Code calls it after the terminal is shown, and a test that
+       * wants output has to call it the same way.
+       */
+      createTerminal(options) {
+        const terminal = {
+          name: options?.name ?? "",
+          options,
+          shown: false,
+          disposed: false,
+          exitStatus: undefined,
+          show() {
+            terminal.shown = true;
+          },
+          hide() {},
+          sendText() {},
+          dispose() {
+            terminal.disposed = true;
+            options?.pty?.close?.(undefined);
+          },
+        };
+        calls.terminals.push(terminal);
+        return terminal;
+      },
     },
 
     workspace: {
       workspaceFolders: undefined,
+      textDocuments: [],
       registerFileSystemProvider(scheme, provider) {
         registered.fileSystemProvider = { scheme, provider };
         return { dispose() {} };
@@ -438,6 +528,22 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
         return true;
       },
     },
+
+    /**
+     * The host registry reads `all` on activation and `getExtension()` only
+     * when a runtime is chosen. A test pack is any object in `all` with an
+     * `activate()`; `packageJSON.contributes` is what the registry scans.
+     */
+    extensions: {
+      all: [],
+      getExtension(id) {
+        return vscode.extensions.all.find((extension) => extension.id === id);
+      },
+      onDidChange(listener) {
+        listeners.extensions.push(listener);
+        return { dispose() {} };
+      },
+    },
   };
 
   return {
@@ -448,14 +554,38 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
     listeners,
     quickPicks,
     registered,
+    statusItems,
+    outputChannels,
   };
 }
 
 // ---------------------------------------------------------------------------
 
-/** Loads the extension against fresh fakes and returns everything a test needs. */
+/**
+ * Loads an extension against fresh fakes and returns everything a test needs.
+ *
+ * `extensionDir` names a folder under extensions/ and `internals` is the list
+ * of names the test-side epilogue exposes; both default to the RuntimeFS
+ * extension, which is what most tests load.
+ *
+ * `crossOriginIsolated` is passed as a function parameter rather than assigned
+ * onto globalThis, for the same reason as `navigator`: it has to be scoped to
+ * the loaded extension. Node has no such global, so without this the host would
+ * always report false.
+ *
+ * @param {object} [options]
+ * @param {string} [options.extensionDir] folder name under extensions/
+ * @param {string[]} [options.internals] names to expose as __internals
+ * @param {boolean} [options.crossOriginIsolated]
+ */
 export function loadExtension(options = {}) {
-  const stub = createVscodeStub(options);
+  const {
+    extensionDir = "runtimefs",
+    internals = INTERNALS,
+    crossOriginIsolated = false,
+    ...stubOptions
+  } = options;
+  const stub = createVscodeStub(stubOptions);
   const opfs = new FakeDirectoryHandle();
 
   const navigator = {
@@ -468,8 +598,9 @@ export function loadExtension(options = {}) {
     },
   };
 
-  const source = readFileSync(EXTENSION, "utf8");
-  const epilogue = `\n;module.exports.__internals = { ${INTERNALS.join(", ")} };\n`;
+  const extensionPath = path.join(RC_ROOT, "extensions", extensionDir, "extension.js");
+  const source = readFileSync(extensionPath, "utf8");
+  const epilogue = `\n;module.exports.__internals = { ${internals.join(", ")} };\n`;
   const factory = new Function(
     "module",
     "exports",
@@ -477,6 +608,7 @@ export function loadExtension(options = {}) {
     "navigator",
     "setTimeout",
     "clearTimeout",
+    "crossOriginIsolated",
     source + epilogue,
   );
 
@@ -495,6 +627,7 @@ export function loadExtension(options = {}) {
     navigator,
     setTimeout,
     clearTimeout,
+    crossOriginIsolated,
   );
 
   return {
@@ -503,6 +636,44 @@ export function loadExtension(options = {}) {
     exports: module.exports,
     internals: module.exports.__internals,
     requested,
+  };
+}
+
+/** A fake ExtensionContext with the two mementos and a subscriptions array. */
+export function fakeContext(initial = {}) {
+  const state = { global: new Map(Object.entries(initial.global ?? {})) };
+  const memento = (map) => ({
+    get(key, fallback) {
+      return map.has(key) ? map.get(key) : fallback;
+    },
+    async update(key, value) {
+      map.set(key, value);
+    },
+    keys() {
+      return [...map.keys()];
+    },
+  });
+  return {
+    subscriptions: [],
+    globalState: memento(state.global),
+    workspaceState: memento(new Map()),
+    extensionUri: {
+      scheme: "file",
+      path: "/extensions/runtime-host",
+      toString: () => "file:/extensions/runtime-host",
+    },
+    asAbsolutePath: (relative) => `/extensions/runtime-host/${relative}`,
+  };
+}
+
+/** A fake TextDocument with just what the host reads. */
+export function fakeDocument(uriString, { languageId = "plaintext", text = "", isDirty = false } = {}) {
+  return {
+    uri: { scheme: uriString.split(":")[0], path: uriString.replace(/^[^:]*:/, ""), toString: () => uriString },
+    languageId,
+    isDirty,
+    fileName: uriString,
+    getText: () => text,
   };
 }
 

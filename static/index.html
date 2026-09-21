@@ -116,6 +116,9 @@
 		const pythonRfsExtension = URI.parse(
 			new URL('./rc-extensions/python-rc/', window.location.href).toString()
 		);
+		const runtimeHostExtension = URI.parse(
+			new URL('./rc-extensions/runtime-host/', window.location.href).toString()
+		);
 
 		/**
 		 * RuntimeFS's service worker caches per folder, so a preview tab keeps
@@ -273,7 +276,7 @@
 			...config,
 			webviewEndpoint,
 			workspaceProvider,
-			additionalBuiltinExtensions: [runtimefsExtension, pythonRfsExtension],
+			additionalBuiltinExtensions: [runtimefsExtension, pythonRfsExtension, runtimeHostExtension],
 			// Handlers are functions, so these cannot live in the JSON config.
 			commands: [
 				{ id: 'runtimecode.internal.invalidateRfsCache', handler: invalidateRfsCache },

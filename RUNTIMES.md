@@ -4,9 +4,13 @@ A plan for running code inside RuntimeCode: WebAssembly interpreters and
 compilers, shipped as optional **runtime packs**, with more than one pack per
 language where the trade-offs really differ.
 
-None of it is built yet. This file exists so the constraints are written down
-before the code is, because most of them are only discoverable by reading
-upstream or by watching something fail silently in a browser.
+The runtime host exists: `extensions/runtime-host/` discovers runtime packs,
+owns the Run command and the terminal, and is covered by `test/runtimehost.test.mjs`
+against a fake provider. No pack is built yet; the host is inert with nothing to
+load, which is exactly what M1 is for. This file exists so the constraints are
+written down before the rest of the code is, because most of them are only
+discoverable by reading upstream or by watching something fail silently in a
+browser.
 
 ## What we are actually building
 

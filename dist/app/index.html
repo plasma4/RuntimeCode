@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<script>performance.mark('code/didStartRenderer');</script>
+	<meta charset="utf-8" />
+
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-title" content="RuntimeCode">
+	<meta name="viewport"
+		content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+
+	<!--
+		RuntimeCode's custom bootstrap logic.
+	-->
+	<meta id="vscode-workbench-web-configuration" data-settings="{&quot;productConfiguration&quot;:{&quot;nameShort&quot;:&quot;RuntimeCode&quot;,&quot;nameLong&quot;:&quot;RuntimeCode&quot;,&quot;applicationName&quot;:&quot;runtimecode&quot;,&quot;dataFolderName&quot;:&quot;.runtimecode&quot;,&quot;sharedDataFolderName&quot;:&quot;.vscode-oss-shared&quot;,&quot;win32MutexName&quot;:&quot;vscodeoss&quot;,&quot;licenseName&quot;:&quot;MIT&quot;,&quot;licenseUrl&quot;:&quot;https://github.com/plasma4/runtimecode/blob/main/LICENSE&quot;,&quot;serverLicenseUrl&quot;:&quot;https://github.com/plasma4/runtimecode/blob/main/LICENSE&quot;,&quot;serverGreeting&quot;:[],&quot;serverLicense&quot;:[],&quot;serverLicensePrompt&quot;:&quot;&quot;,&quot;serverApplicationName&quot;:&quot;code-server-oss&quot;,&quot;serverDataFolderName&quot;:&quot;.vscode-server-oss&quot;,&quot;tunnelApplicationName&quot;:&quot;code-tunnel-oss&quot;,&quot;win32DirName&quot;:&quot;Microsoft Code OSS&quot;,&quot;win32NameVersion&quot;:&quot;Microsoft Code OSS&quot;,&quot;win32RegValueName&quot;:&quot;CodeOSS&quot;,&quot;win32x64AppId&quot;:&quot;{{D77B7E06-80BA-4137-BCF4-654B95CCEBC5}&quot;,&quot;win32arm64AppId&quot;:&quot;{{D1ACE434-89C5-48D1-88D3-E2991DF85475}&quot;,&quot;win32x64UserAppId&quot;:&quot;{{CC6B787D-37A0-49E8-AE24-8559A032BE0C}&quot;,&quot;win32arm64UserAppId&quot;:&quot;{{3AEBF0C8-F733-4AD4-BADE-FDB816D53D7B}&quot;,&quot;win32AppUserModelId&quot;:&quot;Microsoft.CodeOSS&quot;,&quot;win32ShellNameShort&quot;:&quot;C&amp;ode - OSS&quot;,&quot;win32TunnelServiceMutex&quot;:&quot;vscodeoss-tunnelservice&quot;,&quot;win32TunnelMutex&quot;:&quot;vscodeoss-tunnel&quot;,&quot;darwinBundleIdentifier&quot;:&quot;com.visualstudio.code.oss&quot;,&quot;darwinProfileUUID&quot;:&quot;47827DD9-4734-49A0-AF80-7E19B11495CC&quot;,&quot;darwinProfilePayloadUUID&quot;:&quot;CF808BE7-53F3-46C6-A7E2-7EDB98A5E959&quot;,&quot;linuxIconName&quot;:&quot;code-oss&quot;,&quot;licenseFileName&quot;:&quot;LICENSE.txt&quot;,&quot;reportIssueUrl&quot;:&quot;https://github.com/plasma4/runtimecode/issues/new&quot;,&quot;nodejsArtifactFeed&quot;:&quot;&quot;,&quot;electronArtifactFeed&quot;:&quot;&quot;,&quot;urlProtocol&quot;:&quot;runtimecode&quot;,&quot;agentsTelemetryAppName&quot;:&quot;agents&quot;,&quot;builtInExtensions&quot;:[{&quot;name&quot;:&quot;ms-vscode.js-debug-companion&quot;,&quot;version&quot;:&quot;1.1.3&quot;,&quot;sha256&quot;:&quot;7380a890787452f14b2db7835dfa94de538caf358ebc263f9d46dd68ac52de93&quot;,&quot;repo&quot;:&quot;https://github.com/microsoft/vscode-js-debug-companion&quot;,&quot;metadata&quot;:{&quot;id&quot;:&quot;99cb0b7f-7354-4278-b8da-6cc79972169d&quot;,&quot;publisherId&quot;:{&quot;publisherId&quot;:&quot;5f5636e7-69ed-4afe-b5d6-8d231fb3d3ee&quot;,&quot;publisherName&quot;:&quot;ms-vscode&quot;,&quot;displayName&quot;:&quot;Microsoft&quot;,&quot;flags&quot;:&quot;verified&quot;},&quot;publisherDisplayName&quot;:&quot;Microsoft&quot;}},{&quot;name&quot;:&quot;ms-vscode.js-debug&quot;,&quot;version&quot;:&quot;1.117.0&quot;,&quot;sha256&quot;:&quot;854eeb8a785b1f41ba2bd02d7ccd4fdbe10021b61473293973c7e96d036c7fb8&quot;,&quot;repo&quot;:&quot;https://github.com/microsoft/vscode-js-debug&quot;,&quot;metadata&quot;:{&quot;id&quot;:&quot;25629058-ddac-4e17-abba-74678e126c5d&quot;,&quot;publisherId&quot;:{&quot;publisherId&quot;:&quot;5f5636e7-69ed-4afe-b5d6-8d231fb3d3ee&quot;,&quot;publisherName&quot;:&quot;ms-vscode&quot;,&quot;displayName&quot;:&quot;Microsoft&quot;,&quot;flags&quot;:&quot;verified&quot;},&quot;publisherDisplayName&quot;:&quot;Microsoft&quot;}},{&quot;name&quot;:&quot;ms-vscode.vscode-js-profile-table&quot;,&quot;version&quot;:&quot;1.0.11&quot;,&quot;sha256&quot;:&quot;a962a1e6a3baf74c9354b7f47fa96e6d6f0423a63bff55d7f976b6134a748ae9&quot;,&quot;repo&quot;:&quot;https://github.com/microsoft/vscode-js-profile-visualizer&quot;,&quot;metadata&quot;:{&quot;id&quot;:&quot;7e52b41b-71ad-457b-ab7e-0620f1fc4feb&quot;,&quot;publisherId&quot;:{&quot;publisherId&quot;:&quot;5f5636e7-69ed-4afe-b5d6-8d231fb3d3ee&quot;,&quot;publisherName&quot;:&quot;ms-vscode&quot;,&quot;displayName&quot;:&quot;Microsoft&quot;,&quot;flags&quot;:&quot;verified&quot;},&quot;publisherDisplayName&quot;:&quot;Microsoft&quot;}}],&quot;defaultChatAgent&quot;:{&quot;extensionId&quot;:&quot;GitHub.copilot&quot;,&quot;chatExtensionId&quot;:&quot;GitHub.copilot-chat&quot;,&quot;chatExtensionOutputId&quot;:&quot;GitHub.copilot-chat.GitHub Copilot Chat.log&quot;,&quot;chatExtensionOutputExtensionStateCommand&quot;:&quot;github.copilot.debug.extensionState&quot;,&quot;documentationUrl&quot;:&quot;https://aka.ms/github-copilot-overview&quot;,&quot;termsStatementUrl&quot;:&quot;https://aka.ms/github-copilot-terms-statement&quot;,&quot;privacyStatementUrl&quot;:&quot;https://aka.ms/github-copilot-privacy-statement&quot;,&quot;skusDocumentationUrl&quot;:&quot;https://aka.ms/github-copilot-plans&quot;,&quot;optimizeUsageDocumentationUrl&quot;:&quot;https://aka.ms/token-usage-tips&quot;,&quot;publicCodeMatchesUrl&quot;:&quot;https://aka.ms/github-copilot-match-public-code&quot;,&quot;managePlanUrl&quot;:&quot;https://aka.ms/github-copilot-manage-plan&quot;,&quot;upgradePlanUrl&quot;:&quot;https://aka.ms/github-copilot-upgrade-plan&quot;,&quot;signUpUrl&quot;:&quot;https://aka.ms/github-sign-up&quot;,&quot;provider&quot;:{&quot;default&quot;:{&quot;id&quot;:&quot;github&quot;,&quot;name&quot;:&quot;GitHub&quot;},&quot;enterprise&quot;:{&quot;id&quot;:&quot;github-enterprise&quot;,&quot;name&quot;:&quot;GHE&quot;},&quot;google&quot;:{&quot;id&quot;:&quot;google&quot;,&quot;name&quot;:&quot;Google&quot;},&quot;apple&quot;:{&quot;id&quot;:&quot;apple&quot;,&quot;name&quot;:&quot;Apple&quot;},&quot;microsoft&quot;:{&quot;id&quot;:&quot;microsoft&quot;,&quot;name&quot;:&quot;Microsoft&quot;}},&quot;providerExtensionId&quot;:&quot;vscode.github-authentication&quot;,&quot;providerUriSetting&quot;:&quot;github-enterprise.uri&quot;,&quot;providerScopes&quot;:[[&quot;read:user&quot;,&quot;user:email&quot;,&quot;repo&quot;,&quot;workflow&quot;],[&quot;user:email&quot;],[&quot;read:user&quot;]],&quot;entitlementUrl&quot;:&quot;https://api.github.com/copilot_internal/user&quot;,&quot;entitlementSignupLimitedUrl&quot;:&quot;https://api.github.com/copilot_internal/subscribe_limited_user&quot;,&quot;chatQuotaExceededContext&quot;:&quot;github.copilot.chat.quotaExceeded&quot;,&quot;completionsQuotaExceededContext&quot;:&quot;github.copilot.completions.quotaExceeded&quot;,&quot;walkthroughCommand&quot;:&quot;github.copilot.open.walkthrough&quot;,&quot;completionsMenuCommand&quot;:&quot;github.copilot.toggleStatusMenu&quot;,&quot;chatRefreshTokenCommand&quot;:&quot;github.copilot.refreshToken&quot;,&quot;generateCommitMessageCommand&quot;:&quot;github.copilot.git.generateCommitMessage&quot;,&quot;resolveMergeConflictsCommand&quot;:&quot;github.copilot.git.resolveMergeConflicts&quot;,&quot;completionsAdvancedSetting&quot;:&quot;github.copilot.advanced&quot;,&quot;completionsEnablementSetting&quot;:&quot;github.copilot.enable&quot;,&quot;nextEditSuggestionsSetting&quot;:&quot;github.copilot.nextEditSuggestions.enabled&quot;,&quot;tokenEntitlementUrl&quot;:&quot;https://api.github.com/copilot_internal/v2/token&quot;,&quot;mcpRegistryDataUrl&quot;:&quot;https://api.github.com/copilot/mcp_registry&quot;,&quot;managedSettingsUrl&quot;:&quot;https://api.github.com/copilot_internal/managed_settings&quot;},&quot;trustedExtensionAuthAccess&quot;:{&quot;github&quot;:[&quot;GitHub.copilot-chat&quot;],&quot;github-enterprise&quot;:[&quot;GitHub.copilot-chat&quot;],&quot;microsoft&quot;:[&quot;vscode.github-authentication&quot;]},&quot;onboardingKeymaps&quot;:[{&quot;id&quot;:&quot;vscode&quot;,&quot;label&quot;:&quot;VS Code&quot;,&quot;description&quot;:&quot;Default keyboard mapping&quot;},{&quot;id&quot;:&quot;sublime&quot;,&quot;label&quot;:&quot;Sublime Text&quot;,&quot;extensionId&quot;:&quot;ms-vscode.sublime-keybindings&quot;,&quot;description&quot;:&quot;Keyboard mapping from Sublime Text&quot;},{&quot;id&quot;:&quot;intellij&quot;,&quot;label&quot;:&quot;IntelliJ / JetBrains&quot;,&quot;extensionId&quot;:&quot;k--kato.intellij-idea-keybindings&quot;,&quot;description&quot;:&quot;Keyboard mapping from IntelliJ IDEA&quot;},{&quot;id&quot;:&quot;vim&quot;,&quot;label&quot;:&quot;Vim&quot;,&quot;extensionId&quot;:&quot;vscodevim.vim&quot;,&quot;description&quot;:&quot;Vim modal editing&quot;},{&quot;id&quot;:&quot;eclipse&quot;,&quot;label&quot;:&quot;Eclipse&quot;,&quot;extensionId&quot;:&quot;alphabotsec.vscode-eclipse-keybindings&quot;,&quot;description&quot;:&quot;Keyboard mapping from Eclipse&quot;},{&quot;id&quot;:&quot;notepadpp&quot;,&quot;label&quot;:&quot;Notepad++&quot;,&quot;extensionId&quot;:&quot;ms-vscode.notepadplusplus-keybindings&quot;,&quot;description&quot;:&quot;Keyboard mapping from Notepad++&quot;}],&quot;onboardingThemes&quot;:[{&quot;id&quot;:&quot;dark-2026&quot;,&quot;label&quot;:&quot;Dark 2026&quot;,&quot;themeId&quot;:&quot;Dark 2026&quot;,&quot;type&quot;:&quot;dark&quot;},{&quot;id&quot;:&quot;hc-dark&quot;,&quot;label&quot;:&quot;Dark High Contrast&quot;,&quot;themeId&quot;:&quot;Default High Contrast&quot;,&quot;type&quot;:&quot;hcDark&quot;},{&quot;id&quot;:&quot;solarized-dark&quot;,&quot;label&quot;:&quot;Solarized Dark&quot;,&quot;themeId&quot;:&quot;Solarized Dark&quot;,&quot;type&quot;:&quot;dark&quot;},{&quot;id&quot;:&quot;light-2026&quot;,&quot;label&quot;:&quot;Light 2026&quot;,&quot;themeId&quot;:&quot;Light 2026&quot;,&quot;type&quot;:&quot;light&quot;},{&quot;id&quot;:&quot;hc-light&quot;,&quot;label&quot;:&quot;Light High Contrast&quot;,&quot;themeId&quot;:&quot;Default High Contrast Light&quot;,&quot;type&quot;:&quot;hcLight&quot;},{&quot;id&quot;:&quot;solarized-light&quot;,&quot;label&quot;:&quot;Solarized Light&quot;,&quot;themeId&quot;:&quot;Solarized Light&quot;,&quot;type&quot;:&quot;light&quot;}],&quot;builtInExtensionsEnabledWithAutoUpdates&quot;:[&quot;GitHub.copilot-chat&quot;],&quot;sessionsWindowAllowedExtensions&quot;:[],&quot;extensionsGallery&quot;:{&quot;serviceUrl&quot;:&quot;https://open-vsx.org/vscode/gallery&quot;,&quot;itemUrl&quot;:&quot;https://open-vsx.org/vscode/item&quot;,&quot;resourceUrlTemplate&quot;:&quot;https://open-vsx.org/vscode/asset/{publisher}/{name}/{version}/Microsoft.VisualStudio.Code.WebResources/{path}&quot;,&quot;controlUrl&quot;:&quot;&quot;,&quot;nlsBaseUrl&quot;:&quot;&quot;},&quot;embedderIdentifier&quot;:&quot;runtimecode-static&quot;},&quot;configurationDefaults&quot;:{&quot;workbench.colorTheme&quot;:&quot;Dark 2026&quot;,&quot;chat.disableAIFeatures&quot;:true,&quot;telemetry.telemetryLevel&quot;:&quot;off&quot;,&quot;telemetry.feedback.enabled&quot;:false,&quot;update.mode&quot;:&quot;none&quot;,&quot;update.showReleaseNotes&quot;:false,&quot;extensions.autoUpdate&quot;:false,&quot;extensions.autoCheckUpdates&quot;:false,&quot;workbench.enableExperiments&quot;:false,&quot;workbench.settings.enableNaturalLanguageSearch&quot;:false,&quot;npm.fetchOnlinePackageInfo&quot;:false,&quot;git.autofetch&quot;:false},&quot;initialColorTheme&quot;:{&quot;themeType&quot;:&quot;dark&quot;},&quot;enableWorkspaceTrust&quot;:true}">
+
+	<link rel="icon" href="./favicon.ico" type="image/x-icon" />
+	<link rel="manifest" href="./manifest.json" crossorigin="use-credentials" />
+	<link rel="stylesheet" href="./out/vs/workbench/workbench.web.main.internal.css">
+	<style>
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+		}
+
+		#rc-error {
+			display: none;
+			font: 13px ui-monospace, monospace;
+			padding: 1rem;
+			color: #d33;
+			white-space: pre-wrap;
+		}
+	</style>
+</head>
+
+<body aria-label="">
+	<pre id="rc-error"></pre>
+</body>
+
+<script>
+	globalThis._VSCODE_FILE_ROOT = new URL('./out/', window.location.href).toString();
+</script>
+
+<!-- Built-in English strings. Must load before the workbench module. -->
+<script type="module" src="./out/nls.messages.js"></script>
+
+<script type="module">
+	const showError = (message) => {
+		const el = document.getElementById('rc-error');
+		el.style.display = 'block';
+		el.textContent = 'RuntimeCode failed to start:\n\n' + message;
+	};
+
+	try {
+		const settings = document.getElementById('vscode-workbench-web-configuration').getAttribute('data-settings');
+		if (!settings) { throw new Error('missing workbench configuration'); }
+		const config = JSON.parse(settings);
+
+		const { create, URI } = await import('./out/vs/workbench/workbench.web.main.internal.js');
+
+		/**
+		 * Minimal IWorkspaceProvider (see vs/workbench/browser/web.api.ts). The
+		 * workspace is carried in the URL so a reload reopens the same folder,
+		 * and so RuntimeFS folders can be linked to directly.
+		 */
+		const params = new URLSearchParams(window.location.search);
+		const folder = params.get('folder');
+		const workspace = params.get('workspace');
+
+		const toWorkspace = () => {
+			if (workspace) { return { workspaceUri: URI.parse(workspace) }; }
+			if (folder) { return { folderUri: URI.parse(folder) }; }
+			return undefined;	// empty workbench
+		};
+
+		const workspaceProvider = {
+			workspace: toWorkspace(),
+			trusted: true,
+			payload: [],
+			async open(target, options) {
+				const next = new URL(window.location.href);
+				next.searchParams.delete('folder');
+				next.searchParams.delete('workspace');
+				if (target && 'folderUri' in target) {
+					next.searchParams.set('folder', target.folderUri.toString());
+				} else if (target && 'workspaceUri' in target) {
+					next.searchParams.set('workspace', target.workspaceUri.toString());
+				}
+
+				if (options?.reuse) {
+					window.location.href = next.toString();
+					return true;
+				}
+				return !!window.open(next.toString(), '_blank');
+			}
+		};
+
+		// Our extensions ship beside the workbench and are registered as built-ins.
+		// The URIs have to be built at runtime because the folder can be served
+		// from any path, including /n/<Folder>/ inside RuntimeFS itself.
+		const runtimefsExtension = URI.parse(
+			new URL('./rc-extensions/runtimefs/', window.location.href).toString()
+		);
+		const pythonRfsExtension = URI.parse(
+			new URL('./rc-extensions/python-rc/', window.location.href).toString()
+		);
+		const runtimeHostExtension = URI.parse(
+			new URL('./rc-extensions/runtime-host/', window.location.href).toString()
+		);
+		const luaWasmoonExtension = URI.parse(
+			new URL('./rc-extensions/lua-wasmoon/', window.location.href).toString()
+		);
+
+		/**
+		 * RuntimeFS's service worker caches per folder, so a preview tab keeps
+		 * serving stale files after an edit until it is told otherwise. The
+		 * extension host is a worker and has no ServiceWorkerContainer, so the
+		 * extension asks the workbench to relay the message from here.
+		 */
+		const invalidateRfsCache = async (folder) => {
+			const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+			if (!sw || typeof folder !== 'string') { return false; }
+			sw.postMessage({ type: 'INVALIDATE_CACHE', folderName: folder });
+			return true;
+		};
+
+		/**
+		 * RuntimeFS's own worker, by script name. rfs.js registers `./sw.min.js`
+		 * (its SW_URL, which that file invites you to change) and sw.js is the
+		 * unminified build of the same thing. rc-webview-sw.js has to fail this
+		 * test: it is a real file at the same root, and the leading slash is
+		 * what keeps it out.
+		 */
+		const RUNTIMEFS_WORKER = /\/sw(\.min)?\.js$/;
+
+		/**
+		 * The directory RuntimeFS is served from, or undefined.
+		 *
+		 * Two derivations, because there are two deployments.
+		 *
+		 * Served from inside a RuntimeFS folder, the URL says it: everything
+		 * before the `/n/` segment is the root. That is authoritative, because a
+		 * `/n/` path cannot be reached at all unless RuntimeFS's worker served
+		 * it, so it is tried first.
+		 *
+		 * Served from real files on the server, there is no `/n/` segment, and
+		 * RuntimeFS can still be there. sw.js:41 computes its own base as
+		 * `new URL("./", self.location)` and rfs.js:138 registers it with the
+		 * default scope, so it controls every page in that directory rather than
+		 * only the virtual ones. RuntimeCode at <root>/rc/ is controlled by it
+		 * and can fetch <root>/n/<Folder>/ perfectly well. Reading the root back
+		 * off the controller's script URL is the same computation the worker
+		 * does, which keeps this derived instead of configured.
+		 *
+		 * A page that loads inside an active worker's scope is controlled from
+		 * the start, so there is no window where this is merely too early. No
+		 * controller means RuntimeFS has never been opened in this browser, and
+		 * a deployment that renamed SW_URL reports standalone, which is what
+		 * every server-path deployment did before.
+		 */
+		const getRuntimeFsBase = async () => {
+			const url = new URL(window.location.href);
+			const index = url.pathname.indexOf('/n/');
+			if (index !== -1) { return url.origin + url.pathname.slice(0, index); }
+
+			const script = navigator.serviceWorker?.controller?.scriptURL;
+			if (!script || !RUNTIMEFS_WORKER.test(new URL(script).pathname)) { return undefined; }
+			// No trailing slash: callers append `/n/<path>` and `/little-export.core.js`.
+			return new URL('./', script).toString().replace(/\/$/, '');
+		};
+
+		const getRuntimeCodeBase = async () => new URL('./', window.location.href).toString();
+
+		// The extension host is a worker and has no window.open.
+		const openExternalTab = async (target) => {
+			if (typeof target !== 'string') { return false; }
+			return !!window.open(target, '_blank', 'noopener');
+		};
+
+		const copyDirectory = async (source, destination) => {
+			for await (const [name, entry] of source.entries()) {
+				if (entry.kind === 'directory') {
+					await copyDirectory(entry, await destination.getDirectoryHandle(name, { create: true }));
+				} else {
+					const writable = await (await destination.getFileHandle(name, { create: true })).createWritable();
+					await writable.write(await entry.getFile());
+					await writable.close();
+				}
+			}
+		};
+
+		/**
+		 * Installed runtime packs, resolved to extension URLs for
+		 * additionalBuiltinExtensions.
+		 *
+		 * The python-rc host writes `rfs/.runtimecode/packs.json` at install
+		 * time. Each entry is a RuntimeFS folder, so it is only servable as an
+		 * extension URL (`/n/<Folder>/<id>/`) when RuntimeFS's service worker
+		 * controls this page. The same getRuntimeFsBase derivation that decides
+		 * whether packs can exist at all is used here, so standalone and
+		 * RuntimeFS-served deployments cannot disagree.
+		 *
+		 * Served standalone there is no `/n/` segment and so no packs, which is
+		 * the same degradation the preview commands already handle: the host
+		 * says so rather than showing an empty runtime list.
+		 */
+		const readInstalledPacks = async () => {
+			if (!navigator.storage?.getDirectory) { return []; }
+			try {
+				const root = await navigator.storage.getDirectory();
+				const rfs = await root.getDirectoryHandle('rfs');
+				const dir = await rfs.getDirectoryHandle('.runtimecode');
+				const file = await dir.getFileHandle('packs.json');
+				const text = await (await file.getFile()).text();
+				const registry = text ? JSON.parse(text) : {};
+				if (!registry.packs || typeof registry.packs !== 'object') { return []; }
+				const base = await getRuntimeFsBase();
+				if (!base) { return []; }
+				const folder = typeof registry.folder === 'string' ? registry.folder : 'RC-Packs';
+				return Object.keys(registry.packs)
+					.filter((id) => registry.packs[id])
+					.map((id) => `${base}/n/${encodeURIComponent(folder)}/${encodeURIComponent(id)}/`);
+			} catch {
+				// No packs installed yet, or OPFS unavailable: an empty list is
+				// the honest answer, not an error page.
+				return [];
+			}
+		};
+
+		/**
+		 * Pick a native directory and copy it into OPFS under rfs/<name>, then hand
+		 * the name back. Only the copying happens here, because only the window has
+		 * the picker. Registering the folder in rfs_system.json is the extension's
+		 * job: a second registry writer living here was free to drift from the one
+		 * in extension.js, and this one was the one no test could reach.
+		 */
+		const importRfsFolder = async () => {
+			if (!window.showDirectoryPicker) {
+				throw new Error('Import RuntimeFS Folder requires Chromium\'s directory picker.');
+			}
+			const source = await window.showDirectoryPicker({ mode: 'read' });
+			const name = window.prompt('Name for the RuntimeFS folder:', source.name)?.trim();
+			if (!name) { return undefined; }
+			if (/[\\/]/.test(name)) { throw new Error('The folder name cannot contain slashes.'); }
+
+			const copy = async () => {
+				const root = await navigator.storage.getDirectory();
+				const rfs = await root.getDirectoryHandle('rfs', { create: true });
+				let exists = true;
+				try { await rfs.getDirectoryHandle(name); } catch { exists = false; }
+				if (exists && !window.confirm(`Replace the existing RuntimeFS folder "${name}"?`)) { return undefined; }
+				if (exists) { await rfs.removeEntry(name, { recursive: true }); }
+				await copyDirectory(source, await rfs.getDirectoryHandle(name, { create: true }));
+				return name;
+			};
+			return navigator.locks ? navigator.locks.request(`rfs_write_${name}`, copy) : copy();
+		};
+
+		const loadLittleExport = async () => {
+			if (window.LittleExport) { return window.LittleExport; }
+			const base = await getRuntimeFsBase();
+			if (!base) { throw new Error('Export requires RuntimeCode to be served from RuntimeFS.'); }
+			await new Promise((resolve, reject) => {
+				const script = document.createElement('script');
+				script.src = new URL('little-export.core.js', `${base}/`).toString();
+				script.onload = resolve;
+				script.onerror = () => reject(new Error('Could not load LittleExport from RuntimeFS.'));
+				document.head.append(script);
+			});
+			if (!window.LittleExport) { throw new Error('LittleExport did not initialize.'); }
+			return window.LittleExport;
+		};
+
+		/** Stream a single OPFS folder through LittleExport and save it as .tar.gz. */
+		const exportRfsFolder = async (name) => {
+			if (typeof name !== 'string' || !name) { throw new Error('Invalid RuntimeFS folder.'); }
+			if (!window.CompressionStream) { throw new Error('Export requires Chromium\'s CompressionStream support.'); }
+			const root = await navigator.storage.getDirectory();
+			const rfs = await root.getDirectoryHandle('rfs');
+			const folder = await rfs.getDirectoryHandle(name);
+			const tar = (await loadLittleExport()).folderToTarStream(folder, undefined, { pathPrefix: name });
+			const archive = tar.pipeThrough(new CompressionStream('gzip'));
+			const suggestedName = `${name}.tar.gz`;
+			if (window.showSaveFilePicker) {
+				const handle = await window.showSaveFilePicker({ suggestedName, types: [{ description: 'Gzip tar archive', accept: { 'application/gzip': ['.tar.gz'] } }] });
+				await archive.pipeTo(await handle.createWritable());
+				return true;
+			}
+			const blob = await new Response(archive).blob();
+			const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: suggestedName });
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(link.href), 0);
+			return true;
+		};
+
+		// Must be absolute: webviewElement.ts:585 parses this and compares
+		// scheme://authority against the origin of messages coming from the
+		// webview iframe. A relative value parses to "://" and every webview
+		// message is dropped. Computed here so the folder stays portable.
+		const webviewEndpoint = new URL(
+			'./out/vs/workbench/contrib/webview/browser/pre', window.location.href
+		).toString();
+
+		// Installed runtime packs join the built-in extensions: a pack is only
+		// servable as an extension URL when RuntimeFS controls the page, so the
+		// same base derivation that gates pack existence is reused here.
+		const installedPacks = await readInstalledPacks();
+
+		await create(document.body, {
+			...config,
+			webviewEndpoint,
+			workspaceProvider,
+			additionalBuiltinExtensions: [
+				runtimefsExtension,
+				pythonRfsExtension,
+				runtimeHostExtension,
+				luaWasmoonExtension,
+				...installedPacks.map((url) => URI.parse(url))
+			],
+			// Handlers are functions, so these cannot live in the JSON config.
+			commands: [
+				{ id: 'runtimecode.internal.invalidateRfsCache', handler: invalidateRfsCache },
+				{ id: 'runtimecode.internal.getRuntimeFsBase', handler: getRuntimeFsBase },
+				{ id: 'runtimecode.internal.getRuntimeCodeBase', handler: getRuntimeCodeBase },
+				{ id: 'runtimecode.internal.openExternalTab', handler: openExternalTab },
+				{ id: 'runtimecode.internal.importRfsFolder', handler: importRfsFolder },
+				{ id: 'runtimecode.internal.exportRfsFolder', handler: exportRfsFolder }
+			]
+		});
+	} catch (err) {
+		showError(err && err.stack ? err.stack : String(err));
+		throw err;
+	}
+</script>
+
+</html>

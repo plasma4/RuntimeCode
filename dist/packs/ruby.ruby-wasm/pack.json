@@ -1,0 +1,19 @@
+{
+  "id": "ruby.ruby-wasm",
+  "version": "3.3-wasi-2.10.1",
+  "engine": "ruby-wasi",
+  "license": "MIT",
+  "installBytes": 16457085,
+  "assets": [
+    {
+      "name": "ruby.wasm",
+      "bytes": 16296167,
+      "sha256": "6ed4db69b832690b1b84605a53e607044243c555b85a913f647fd362675b70b0"
+    },
+    {
+      "name": "browser.script.iife.js",
+      "bytes": 160918,
+      "sha256": "6c25f957922e2a9ce0848229c4635f4de74a3a529a92ddeeda4ffb5260940eef"
+    }
+  ]
+}

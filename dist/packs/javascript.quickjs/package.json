@@ -1,0 +1,59 @@
+{
+  "name": "runtimecode-pack-javascript-quickjs",
+  "displayName": "JavaScript (QuickJS-ng)",
+  "description": "QuickJS-ng compiled to WASI: isolated, deterministic JavaScript in under a megabyte. Built from 3.6.2.",
+  "version": "1.0.0",
+  "publisher": "runtimecode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.137.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "browser": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "runtimecode.runtimes": [
+      {
+        "id": "javascript.quickjs",
+        "displayName": "JavaScript (QuickJS-ng)",
+        "languages": [
+          "javascript"
+        ],
+        "tier": "faithful",
+        "engine": "quickjs-wasi",
+        "languageVersion": "ES2020",
+        "site": "worker",
+        "worker": "./session.js",
+        "assets": "./assets/",
+        "pack": "javascript.quickjs",
+        "installBytes": 637405,
+        "license": "MIT",
+        "homepage": "https://github.com/vercel-labs/quickjs-wasi",
+        "summary": "QuickJS-ng compiled to WASI: isolated, deterministic JavaScript in under a megabyte.",
+        "requires": {
+          "crossOriginIsolated": false
+        },
+        "capabilities": {
+          "stdin": "buffered",
+          "threads": false,
+          "packages": "none",
+          "graphics": "none",
+          "debug": false,
+          "fs": "mount"
+        },
+        "isolatedCapabilities": {
+          "stdin": "blocking"
+        }
+      }
+    ]
+  }
+}

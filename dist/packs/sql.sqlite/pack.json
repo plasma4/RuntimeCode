@@ -1,0 +1,29 @@
+{
+  "id": "sql.sqlite",
+  "version": "3.53.4",
+  "engine": "sqlite-wasm",
+  "license": "Apache-2.0",
+  "installBytes": 2180096,
+  "assets": [
+    {
+      "name": "sqlite3.wasm",
+      "bytes": 868907,
+      "sha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752"
+    },
+    {
+      "name": "index.mjs",
+      "bytes": 642742,
+      "sha256": "a6d3fe46aa3f924e7686329f97b0564549ef1f787e0c19924179aef7f72bcc01"
+    },
+    {
+      "name": "sqlite3-worker1.mjs",
+      "bytes": 635942,
+      "sha256": "3756df457cb4e825eba23fadc9d6e261f6494e3ac98016bc3e51fd07dc13cc05"
+    },
+    {
+      "name": "sqlite3-opfs-async-proxy.js",
+      "bytes": 32505,
+      "sha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06"
+    }
+  ]
+}

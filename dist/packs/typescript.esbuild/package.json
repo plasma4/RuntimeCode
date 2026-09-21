@@ -1,0 +1,57 @@
+{
+  "name": "runtimecode-pack-typescript-esbuild",
+  "displayName": "TypeScript (esbuild-wasm)",
+  "description": "Real esbuild in the browser: TypeScript and JSX down to JS, then run through the host's JS tier. Built from 0.28.2.",
+  "version": "1.0.0",
+  "publisher": "runtimecode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.137.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "browser": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "runtimecode.runtimes": [
+      {
+        "id": "typescript.esbuild",
+        "displayName": "TypeScript (esbuild-wasm)",
+        "languages": [
+          "typescript",
+          "javascript"
+        ],
+        "tier": "quick",
+        "engine": "esbuild-wasm",
+        "languageVersion": "transforms TS to JS",
+        "site": "worker",
+        "worker": "./session.js",
+        "assets": "./assets/",
+        "pack": "typescript.esbuild",
+        "installBytes": 14112334,
+        "license": "MIT",
+        "homepage": "https://esbuild.github.io/api/#browser",
+        "summary": "Real esbuild in the browser: TypeScript and JSX down to JS, then run through the host's JS tier.",
+        "requires": {
+          "crossOriginIsolated": false
+        },
+        "capabilities": {
+          "stdin": "none",
+          "threads": false,
+          "packages": "none",
+          "graphics": "none",
+          "debug": false,
+          "fs": "mount"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "typescript.esbuild",
+  "version": "0.28.2",
+  "engine": "esbuild-wasm",
+  "license": "MIT",
+  "installBytes": 14112334,
+  "assets": [
+    {
+      "name": "esbuild.wasm",
+      "bytes": 13978850,
+      "sha256": "b1831a5c0f6cf688034fb94d0419812f165ea316a3380d3fc00a151e562d2eaf"
+    },
+    {
+      "name": "browser.js",
+      "bytes": 133484,
+      "sha256": "91593b8f5d1021600a92443717a52e311bb1e1b772981f6aab76cd0ffba33169"
+    }
+  ]
+}

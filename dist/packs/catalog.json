@@ -1,0 +1,550 @@
+[
+  {
+    "id": "c.browsercc",
+    "version": "0.1.1",
+    "engine": "browsercc",
+    "site": "worker",
+    "tier": "faithful",
+    "license": "MIT",
+    "homepage": "https://github.com/BertalanD/browsercc",
+    "summary": "A real clang/lld compiled to wasm, for compiling single-file C and C++ in the browser.",
+    "installBytes": 113882977,
+    "descriptor": {
+      "id": "c.browsercc",
+      "displayName": "C/C++ (browsercc)",
+      "languages": [
+        "c",
+        "cpp"
+      ],
+      "tier": "faithful",
+      "engine": "browsercc",
+      "languageVersion": "clang",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "c.browsercc",
+      "installBytes": 113882977,
+      "license": "MIT",
+      "homepage": "https://github.com/BertalanD/browsercc",
+      "summary": "A real clang/lld compiled to wasm, for compiling single-file C and C++ in the browser.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "none",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      }
+    },
+    "assets": [
+      {
+        "name": "clang.js",
+        "bytes": 74193,
+        "sha256": "27aeadfcdb71f37fdeb6f1ca339de913ef9e2fdd1fd53c238a5decf635d9b129"
+      },
+      {
+        "name": "clang.wasm",
+        "bytes": 42553880,
+        "sha256": "d574339640a9764544f405d4b5ae79ef7d05e49725b416fba74f5b15c00f8ee5"
+      },
+      {
+        "name": "lld.js",
+        "bytes": 71604,
+        "sha256": "b5054c24942687c744adbadcd549073ce3ecaf69b9fed5fa85a20c046751c1bf"
+      },
+      {
+        "name": "lld.wasm",
+        "bytes": 23202572,
+        "sha256": "810bb3be4eec8ad6bae60ceb7355c07bf7de8a54b5c8acb4d7a80613bd43c4bf"
+      },
+      {
+        "name": "sysroot.tar",
+        "bytes": 28620800,
+        "sha256": "dbed83f93f0fa695f36041b82a95a8cd78f106a3f49d9cd860e57ae1ac823318"
+      },
+      {
+        "name": "stdc++.h.pch",
+        "bytes": 19359928,
+        "sha256": "de0c98ccec24c008d44ab6c10a2d9529a01d049e8d96081ee944115f57956634"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/clang.js",
+      "assets/clang.wasm",
+      "assets/lld.js",
+      "assets/lld.wasm",
+      "assets/sysroot.tar",
+      "assets/stdc++.h.pch"
+    ]
+  },
+  {
+    "id": "javascript.quickjs",
+    "version": "3.6.2",
+    "engine": "quickjs-wasi",
+    "site": "worker",
+    "tier": "faithful",
+    "license": "MIT",
+    "homepage": "https://github.com/vercel-labs/quickjs-wasi",
+    "summary": "QuickJS-ng compiled to WASI: isolated, deterministic JavaScript in under a megabyte.",
+    "installBytes": 637405,
+    "descriptor": {
+      "id": "javascript.quickjs",
+      "displayName": "JavaScript (QuickJS-ng)",
+      "languages": [
+        "javascript"
+      ],
+      "tier": "faithful",
+      "engine": "quickjs-wasi",
+      "languageVersion": "ES2020",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "javascript.quickjs",
+      "installBytes": 637405,
+      "license": "MIT",
+      "homepage": "https://github.com/vercel-labs/quickjs-wasi",
+      "summary": "QuickJS-ng compiled to WASI: isolated, deterministic JavaScript in under a megabyte.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "buffered",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      },
+      "isolatedCapabilities": {
+        "stdin": "blocking"
+      }
+    },
+    "assets": [
+      {
+        "name": "quickjs.wasm",
+        "bytes": 637405,
+        "sha256": "d4c9375f2b1ca4dc95f72c8aa2982a7a9951ac8011490d79c6582df732b4bbd9"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/quickjs.wasm"
+    ]
+  },
+  {
+    "id": "lua.wasmoon",
+    "version": "1.16.0",
+    "engine": "wasmoon",
+    "site": "worker",
+    "tier": "quick",
+    "license": "MIT",
+    "homepage": "https://github.com/ceifa/wasmoon",
+    "summary": "The official Lua VM compiled to wasm, real performance and cheap to embed.",
+    "installBytes": 423233,
+    "descriptor": {
+      "id": "lua.wasmoon",
+      "displayName": "Lua (wasmoon)",
+      "languages": [
+        "lua"
+      ],
+      "tier": "quick",
+      "engine": "wasmoon",
+      "languageVersion": "5.4",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "lua.wasmoon",
+      "installBytes": 423233,
+      "license": "MIT",
+      "homepage": "https://github.com/ceifa/wasmoon",
+      "summary": "The official Lua VM compiled to wasm, real performance and cheap to embed.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "buffered",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      },
+      "isolatedCapabilities": {
+        "stdin": "blocking"
+      }
+    },
+    "assets": [
+      {
+        "name": "glue.wasm",
+        "bytes": 271581,
+        "sha256": "95f3f19ddb740125883bc41d5ec670cd0828e7b58c8bdad385323cbff497b55c"
+      },
+      {
+        "name": "index.js",
+        "bytes": 151652,
+        "sha256": "dc2dcf019449008bb224370052473dc760db28b3ba14fc604e1ca3e8646af35d"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/glue.wasm",
+      "assets/index.js"
+    ]
+  },
+  {
+    "id": "python.pyodide",
+    "version": "0.28.3",
+    "engine": "pyodide",
+    "site": "worker",
+    "tier": "quick",
+    "license": "MPL-2.0 AND Python-2.0",
+    "homepage": "https://pyodide.org/en/stable/usage/downloading-and-deploying.html",
+    "summary": "The whole of CPython, plus micropip and prebuilt scientific wheels.",
+    "installBytes": 12262929,
+    "descriptor": {
+      "id": "python.pyodide",
+      "displayName": "Python (Pyodide)",
+      "languages": [
+        "python"
+      ],
+      "tier": "quick",
+      "engine": "pyodide",
+      "languageVersion": "3.12",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "python.pyodide",
+      "installBytes": 12262929,
+      "license": "MPL-2.0 AND Python-2.0",
+      "homepage": "https://pyodide.org/en/stable/usage/downloading-and-deploying.html",
+      "summary": "The whole of CPython, plus micropip and prebuilt scientific wheels.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "buffered",
+        "threads": false,
+        "packages": "micropip",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      },
+      "isolatedCapabilities": {
+        "stdin": "blocking"
+      }
+    },
+    "assets": [
+      {
+        "name": "pyodide.js",
+        "bytes": 17331,
+        "sha256": "24a458425dcb4ea9836eb5ce26701d18cb769374e2b79247602ba605bf093278"
+      },
+      {
+        "name": "pyodide.asm.js",
+        "bytes": 1073033,
+        "sha256": "b22e5831eade9ff10e6fe2c811c68688cd91f10154377b4f80debcf5bafa1e56"
+      },
+      {
+        "name": "pyodide.asm.wasm",
+        "bytes": 8645967,
+        "sha256": "5effb6a1a6cc4a1a85bec4622701aa797c031e1de923cbbaf2ad47abdc4ab325"
+      },
+      {
+        "name": "python_stdlib.zip",
+        "bytes": 2416866,
+        "sha256": "71fee17f88a6260ec8c9c7c063533ee59c021fdc88a1ce76247378d3c4a35f4c"
+      },
+      {
+        "name": "pyodide-lock.json",
+        "bytes": 109732,
+        "sha256": "f6e6f42f451f42affbbcddb00e8c9a3278dcbf399f57aab9f3f568839a7ff4a6"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/pyodide.js",
+      "assets/pyodide.asm.js",
+      "assets/pyodide.asm.wasm",
+      "assets/python_stdlib.zip",
+      "assets/pyodide-lock.json"
+    ]
+  },
+  {
+    "id": "r.webr",
+    "version": "0.6.0",
+    "engine": "webr",
+    "site": "worker",
+    "tier": "faithful",
+    "license": "GPL-3.0",
+    "homepage": "https://docs.r-wasm.org/webr/latest/",
+    "summary": "R compiled to wasm via Emscripten, with its own repository of precompiled packages.",
+    "installBytes": 18915392,
+    "descriptor": {
+      "id": "r.webr",
+      "displayName": "R (WebR)",
+      "languages": [
+        "r"
+      ],
+      "tier": "faithful",
+      "engine": "webr",
+      "languageVersion": "4.4",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "r.webr",
+      "installBytes": 18915392,
+      "license": "GPL-3.0",
+      "homepage": "https://docs.r-wasm.org/webr/latest/",
+      "summary": "R compiled to wasm via Emscripten, with its own repository of precompiled packages.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "buffered",
+        "threads": false,
+        "packages": "webr-packages",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      }
+    },
+    "assets": [
+      {
+        "name": "R.wasm",
+        "bytes": 18062845,
+        "sha256": "5df459fb222d332e358cf08e4019c0e114398579ed8c62242bfcceeda81222ba"
+      },
+      {
+        "name": "R.js",
+        "bytes": 785875,
+        "sha256": "162adb529111d739b37ef1b9f889eb7afbe4fb3288f8a58166cd6d0b04fd7376"
+      },
+      {
+        "name": "webr.js",
+        "bytes": 66672,
+        "sha256": "4c04d3240de6cd3e7f59e081756168faa8566f8a8b97251400770939815c344a"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/R.wasm",
+      "assets/R.js",
+      "assets/webr.js"
+    ]
+  },
+  {
+    "id": "ruby.ruby-wasm",
+    "version": "3.3-wasi-2.10.1",
+    "engine": "ruby-wasi",
+    "site": "worker",
+    "tier": "quick",
+    "license": "MIT",
+    "homepage": "https://github.com/ruby/ruby.wasm",
+    "summary": "CRuby compiled for WASI, with JS interop.",
+    "installBytes": 16457085,
+    "descriptor": {
+      "id": "ruby.ruby-wasm",
+      "displayName": "Ruby (ruby.wasm)",
+      "languages": [
+        "ruby"
+      ],
+      "tier": "quick",
+      "engine": "ruby-wasi",
+      "languageVersion": "3.3",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "ruby.ruby-wasm",
+      "installBytes": 16457085,
+      "license": "MIT",
+      "homepage": "https://github.com/ruby/ruby.wasm",
+      "summary": "CRuby compiled for WASI, with JS interop.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "buffered",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      },
+      "isolatedCapabilities": {
+        "stdin": "blocking"
+      }
+    },
+    "assets": [
+      {
+        "name": "ruby.wasm",
+        "bytes": 16296167,
+        "sha256": "6ed4db69b832690b1b84605a53e607044243c555b85a913f647fd362675b70b0"
+      },
+      {
+        "name": "browser.script.iife.js",
+        "bytes": 160918,
+        "sha256": "6c25f957922e2a9ce0848229c4635f4de74a3a529a92ddeeda4ffb5260940eef"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/ruby.wasm",
+      "assets/browser.script.iife.js"
+    ]
+  },
+  {
+    "id": "sql.sqlite",
+    "version": "3.53.4",
+    "engine": "sqlite-wasm",
+    "site": "worker",
+    "tier": "quick",
+    "license": "Apache-2.0",
+    "homepage": "https://sqlite.org/wasm/doc/trunk/index.md",
+    "summary": "The official SQLite wasm build, with in-memory and OPFS persistence.",
+    "installBytes": 2180096,
+    "descriptor": {
+      "id": "sql.sqlite",
+      "displayName": "SQLite (wasm)",
+      "languages": [
+        "sql"
+      ],
+      "tier": "quick",
+      "engine": "sqlite-wasm",
+      "languageVersion": "3.53",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "sql.sqlite",
+      "installBytes": 2180096,
+      "license": "Apache-2.0",
+      "homepage": "https://sqlite.org/wasm/doc/trunk/index.md",
+      "summary": "The official SQLite wasm build, with in-memory and OPFS persistence.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "none",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      }
+    },
+    "assets": [
+      {
+        "name": "sqlite3.wasm",
+        "bytes": 868907,
+        "sha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752"
+      },
+      {
+        "name": "index.mjs",
+        "bytes": 642742,
+        "sha256": "a6d3fe46aa3f924e7686329f97b0564549ef1f787e0c19924179aef7f72bcc01"
+      },
+      {
+        "name": "sqlite3-worker1.mjs",
+        "bytes": 635942,
+        "sha256": "3756df457cb4e825eba23fadc9d6e261f6494e3ac98016bc3e51fd07dc13cc05"
+      },
+      {
+        "name": "sqlite3-opfs-async-proxy.js",
+        "bytes": 32505,
+        "sha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/sqlite3.wasm",
+      "assets/index.mjs",
+      "assets/sqlite3-worker1.mjs",
+      "assets/sqlite3-opfs-async-proxy.js"
+    ]
+  },
+  {
+    "id": "typescript.esbuild",
+    "version": "0.28.2",
+    "engine": "esbuild-wasm",
+    "site": "worker",
+    "tier": "quick",
+    "license": "MIT",
+    "homepage": "https://esbuild.github.io/api/#browser",
+    "summary": "Real esbuild in the browser: TypeScript and JSX down to JS, then run through the host's JS tier.",
+    "installBytes": 14112334,
+    "descriptor": {
+      "id": "typescript.esbuild",
+      "displayName": "TypeScript (esbuild-wasm)",
+      "languages": [
+        "typescript",
+        "javascript"
+      ],
+      "tier": "quick",
+      "engine": "esbuild-wasm",
+      "languageVersion": "transforms TS to JS",
+      "site": "worker",
+      "worker": "./session.js",
+      "assets": "./assets/",
+      "pack": "typescript.esbuild",
+      "installBytes": 14112334,
+      "license": "MIT",
+      "homepage": "https://esbuild.github.io/api/#browser",
+      "summary": "Real esbuild in the browser: TypeScript and JSX down to JS, then run through the host's JS tier.",
+      "requires": {
+        "crossOriginIsolated": false
+      },
+      "capabilities": {
+        "stdin": "none",
+        "threads": false,
+        "packages": "none",
+        "graphics": "none",
+        "debug": false,
+        "fs": "mount"
+      }
+    },
+    "assets": [
+      {
+        "name": "esbuild.wasm",
+        "bytes": 13978850,
+        "sha256": "b1831a5c0f6cf688034fb94d0419812f165ea316a3380d3fc00a151e562d2eaf"
+      },
+      {
+        "name": "browser.js",
+        "bytes": 133484,
+        "sha256": "91593b8f5d1021600a92443717a52e311bb1e1b772981f6aab76cd0ffba33169"
+      }
+    ],
+    "files": [
+      "package.json",
+      "extension.js",
+      "session.js",
+      "pack.json",
+      "assets/esbuild.wasm",
+      "assets/browser.js"
+    ]
+  }
+]

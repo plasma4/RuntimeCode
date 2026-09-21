@@ -1,0 +1,14 @@
+{
+  "id": "javascript.quickjs",
+  "version": "3.6.2",
+  "engine": "quickjs-wasi",
+  "license": "MIT",
+  "installBytes": 637405,
+  "assets": [
+    {
+      "name": "quickjs.wasm",
+      "bytes": 637405,
+      "sha256": "d4c9375f2b1ca4dc95f72c8aa2982a7a9951ac8011490d79c6582df732b4bbd9"
+    }
+  ]
+}

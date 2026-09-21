@@ -1,0 +1,24 @@
+{
+  "id": "r.webr",
+  "version": "0.6.0",
+  "engine": "webr",
+  "license": "GPL-3.0",
+  "installBytes": 18915392,
+  "assets": [
+    {
+      "name": "R.wasm",
+      "bytes": 18062845,
+      "sha256": "5df459fb222d332e358cf08e4019c0e114398579ed8c62242bfcceeda81222ba"
+    },
+    {
+      "name": "R.js",
+      "bytes": 785875,
+      "sha256": "162adb529111d739b37ef1b9f889eb7afbe4fb3288f8a58166cd6d0b04fd7376"
+    },
+    {
+      "name": "webr.js",
+      "bytes": 66672,
+      "sha256": "4c04d3240de6cd3e7f59e081756168faa8566f8a8b97251400770939815c344a"
+    }
+  ]
+}

@@ -1,0 +1,293 @@
+{
+	"name": "python-rc",
+	"displayName": "Python (RuntimeCode)",
+	"description": "The host shell for Python in the browser: one Run command, one terminal, three interchangeable runtimes (Pyodide, CPython on WASI, MicroPython).",
+	"version": "0.0.2",
+	"publisher": "runtimecode",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.137.0"
+	},
+	"categories": [
+		"Programming Languages",
+		"Other"
+	],
+	"browser": "./extension.js",
+	"activationEvents": [
+		"onLanguage:python",
+		"onStartupFinished"
+	],
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "runtimecode.python.run",
+				"title": "Run File",
+				"category": "Python",
+				"icon": "$(play)"
+			},
+			{
+				"command": "runtimecode.python.runSelection",
+				"title": "Run Selection",
+				"category": "Python"
+			},
+			{
+				"command": "runtimecode.python.stop",
+				"title": "Stop Running Program",
+				"category": "Python",
+				"icon": "$(debug-stop)"
+			},
+			{
+				"command": "runtimecode.python.selectRuntime",
+				"title": "Select Runtime...",
+				"category": "Python",
+				"icon": "$(beaker)"
+			},
+			{
+				"command": "runtimecode.python.refreshRuntimes",
+				"title": "Refresh Installed Runtimes",
+				"category": "Python"
+			},
+			{
+				"command": "runtimecode.python.showDiagnostics",
+				"title": "Show Runtime Diagnostics",
+				"category": "Python"
+			},
+			{
+				"command": "runtimecode.python.installRuntime",
+				"title": "Install Runtime Pack...",
+				"category": "Python",
+				"icon": "$(cloud-download)"
+			},
+			{
+				"command": "runtimecode.python.uninstallRuntime",
+				"title": "Uninstall Runtime Pack...",
+				"category": "Python",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "runtimecode.python.cleanupPacks",
+				"title": "Clean Up Orphaned Pack Folders",
+				"category": "Python",
+				"icon": "$(broom)"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "runtimecode.python.run",
+				"key": "ctrl+alt+r",
+				"mac": "cmd+alt+r",
+				"when": "editorLangId == python"
+			},
+			{
+				"command": "runtimecode.python.runSelection",
+				"key": "ctrl+alt+enter",
+				"mac": "cmd+alt+enter",
+				"when": "editorLangId == python && editorHasSelection"
+			}
+		],
+		"menus": {
+			"editor/title/run": [
+				{
+					"command": "runtimecode.python.run",
+					"when": "resourceLangId == python",
+					"group": "navigation@1"
+				}
+			],
+			"editor/context": [
+				{
+					"command": "runtimecode.python.runSelection",
+					"when": "resourceLangId == python && editorHasSelection",
+					"group": "1_run@1"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Python (RuntimeCode)",
+			"properties": {
+				"runtimecode.python.defaultRuntime": {
+					"type": "string",
+					"default": "auto",
+					"enum": [
+						"auto",
+						"python.pyodide",
+						"python.cpython-wasi",
+						"python.micropython"
+					],
+					"enumDescriptions": [
+						"Prefer an installed runtime, falling back to the quick tier.",
+						"Pyodide: CPython built with Emscripten, with micropip and prebuilt wheels.",
+						"CPython built for wasm32-wasip1: unpatched upstream, no wheels.",
+						"MicroPython for WebAssembly: a fraction of the size and of the stdlib."
+					],
+					"description": "The runtime a run uses when none has been picked for this workspace."
+				},
+				"runtimecode.python.stdin": {
+					"type": "string",
+					"default": "auto",
+					"enum": [
+						"auto",
+						"blocking",
+						"buffered",
+						"none"
+					],
+					"enumDescriptions": [
+						"The best mode this environment and runtime both support.",
+						"input() really blocks. Needs cross-origin isolation and SharedArrayBuffer.",
+						"Typed input is queued; a read returns what has arrived, EOF if nothing has.",
+						"Reads return EOF immediately."
+					],
+					"markdownDescription": "How standard input behaves. `blocking` needs cross-origin isolation, which is a RuntimeFS Custom Headers setting on the folder RuntimeCode is served from; without it the host falls back and says so."
+				},
+				"runtimecode.python.dirtyBuffers": {
+					"type": "string",
+					"default": "save",
+					"enum": [
+						"save",
+						"ignore"
+					],
+					"enumDescriptions": [
+						"Save unsaved editor buffers before running, the VS Code-typical answer.",
+						"Run what is in storage, which may be older than what is on screen."
+					],
+					"description": "What a run does about unsaved changes. One policy for every runtime: inconsistency here produces bugs that look like runtime bugs."
+				},
+				"runtimecode.python.packsFolder": {
+					"type": "string",
+					"default": "RC-Packs",
+					"description": "The RuntimeFS folder runtime packs are installed into. Packs are served from <RuntimeFS base>/n/<folder>/<runtime id>/."
+				},
+				"runtimecode.python.installThresholdBytes": {
+					"type": "number",
+					"default": 52428800,
+					"minimum": 0,
+					"description": "Ask before installing a runtime larger than this, in bytes. 0 asks every time."
+				},
+				"runtimecode.python.argv": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "Arguments passed to the program after its own name."
+				},
+				"runtimecode.python.env": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					},
+					"default": {},
+					"description": "Environment variables the guest sees, on top of the ones the host sets."
+				},
+				"runtimecode.python.capabilityNotices": {
+					"type": "boolean",
+					"default": true,
+					"description": "Print a line in the terminal whenever a runtime can do less than its manifest advertises, such as stdin degrading to EOF."
+				}
+			}
+		},
+		"runtimecode.runtimes": [
+			{
+				"id": "python.pyodide",
+				"displayName": "Python (Pyodide)",
+				"languages": [
+					"python"
+				],
+				"tier": "quick",
+				"engine": "pyodide",
+				"languageVersion": "3.13",
+				"site": "worker",
+				"pack": "python.pyodide",
+				"worker": "./dist/session.js",
+				"assets": "./assets/",
+				"installBytes": 11534336,
+				"installBytesSource": "estimate",
+				"license": "MPL-2.0 AND Python-2.0",
+				"homepage": "https://pyodide.org/en/stable/usage/downloading-and-deploying.html",
+				"summary": "The whole of CPython, plus micropip and prebuilt scientific wheels.",
+				"requires": {
+					"crossOriginIsolated": false
+				},
+				"capabilities": {
+					"stdin": "buffered",
+					"threads": false,
+					"packages": "micropip",
+					"graphics": "none",
+					"debug": false,
+					"fs": "mount"
+				},
+				"isolatedCapabilities": {
+					"stdin": "blocking"
+				}
+			},
+			{
+				"id": "python.cpython-wasi",
+				"displayName": "Python (CPython on WASI)",
+				"languages": [
+					"python"
+				],
+				"tier": "faithful",
+				"engine": "cpython-wasi",
+				"languageVersion": "3.13",
+				"site": "worker",
+				"pack": "python.cpython-wasi",
+				"worker": "./dist/session.js",
+				"assets": "./assets/",
+				"installBytes": 22020096,
+				"installBytesSource": "estimate",
+				"license": "Python-2.0",
+				"homepage": "https://github.com/python/cpython/tree/main/Platforms/WASI",
+				"summary": "Unpatched upstream CPython for wasm32-wasip1. Behaves like real CPython because it is.",
+				"requires": {
+					"crossOriginIsolated": false
+				},
+				"capabilities": {
+					"stdin": "none",
+					"threads": false,
+					"packages": "none",
+					"graphics": "none",
+					"debug": false,
+					"fs": "mount"
+				},
+				"isolatedCapabilities": {
+					"stdin": "blocking"
+				}
+			},
+			{
+				"id": "python.micropython",
+				"displayName": "Python (MicroPython)",
+				"languages": [
+					"python"
+				],
+				"tier": "tiny",
+				"engine": "micropython",
+				"languageVersion": "3.4 subset",
+				"site": "worker",
+				"pack": "python.micropython",
+				"worker": "./dist/session.js",
+				"assets": "./assets/",
+				"installBytes": 786432,
+				"installBytesSource": "estimate",
+				"license": "MIT",
+				"homepage": "https://github.com/micropython/micropython/tree/master/ports/webassembly",
+				"summary": "A Python that starts in well under a second, with a fraction of the stdlib.",
+				"requires": {
+					"crossOriginIsolated": false
+				},
+				"capabilities": {
+					"stdin": "buffered",
+					"threads": false,
+					"packages": "none",
+					"graphics": "none",
+					"debug": false,
+					"fs": "mount"
+				}
+			}
+		]
+	}
+}

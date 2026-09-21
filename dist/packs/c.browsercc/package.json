@@ -1,0 +1,57 @@
+{
+  "name": "runtimecode-pack-c-browsercc",
+  "displayName": "C/C++ (browsercc)",
+  "description": "A real clang/lld compiled to wasm, for compiling single-file C and C++ in the browser. Built from 0.1.1.",
+  "version": "1.0.0",
+  "publisher": "runtimecode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.137.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "browser": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "runtimecode.runtimes": [
+      {
+        "id": "c.browsercc",
+        "displayName": "C/C++ (browsercc)",
+        "languages": [
+          "c",
+          "cpp"
+        ],
+        "tier": "faithful",
+        "engine": "browsercc",
+        "languageVersion": "clang",
+        "site": "worker",
+        "worker": "./session.js",
+        "assets": "./assets/",
+        "pack": "c.browsercc",
+        "installBytes": 113882977,
+        "license": "MIT",
+        "homepage": "https://github.com/BertalanD/browsercc",
+        "summary": "A real clang/lld compiled to wasm, for compiling single-file C and C++ in the browser.",
+        "requires": {
+          "crossOriginIsolated": false
+        },
+        "capabilities": {
+          "stdin": "none",
+          "threads": false,
+          "packages": "none",
+          "graphics": "none",
+          "debug": false,
+          "fs": "mount"
+        }
+      }
+    ]
+  }
+}

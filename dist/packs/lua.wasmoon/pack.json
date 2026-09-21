@@ -1,0 +1,19 @@
+{
+  "id": "lua.wasmoon",
+  "version": "1.16.0",
+  "engine": "wasmoon",
+  "license": "MIT",
+  "installBytes": 423233,
+  "assets": [
+    {
+      "name": "glue.wasm",
+      "bytes": 271581,
+      "sha256": "95f3f19ddb740125883bc41d5ec670cd0828e7b58c8bdad385323cbff497b55c"
+    },
+    {
+      "name": "index.js",
+      "bytes": 151652,
+      "sha256": "dc2dcf019449008bb224370052473dc760db28b3ba14fc604e1ca3e8646af35d"
+    }
+  ]
+}

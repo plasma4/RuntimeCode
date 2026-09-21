@@ -1,0 +1,56 @@
+{
+  "name": "runtimecode-pack-sql-sqlite",
+  "displayName": "SQLite (wasm)",
+  "description": "The official SQLite wasm build, with in-memory and OPFS persistence. Built from 3.53.4.",
+  "version": "1.0.0",
+  "publisher": "runtimecode",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.137.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "browser": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "runtimecode.runtimes": [
+      {
+        "id": "sql.sqlite",
+        "displayName": "SQLite (wasm)",
+        "languages": [
+          "sql"
+        ],
+        "tier": "quick",
+        "engine": "sqlite-wasm",
+        "languageVersion": "3.53",
+        "site": "worker",
+        "worker": "./session.js",
+        "assets": "./assets/",
+        "pack": "sql.sqlite",
+        "installBytes": 2180096,
+        "license": "Apache-2.0",
+        "homepage": "https://sqlite.org/wasm/doc/trunk/index.md",
+        "summary": "The official SQLite wasm build, with in-memory and OPFS persistence.",
+        "requires": {
+          "crossOriginIsolated": false
+        },
+        "capabilities": {
+          "stdin": "none",
+          "threads": false,
+          "packages": "none",
+          "graphics": "none",
+          "debug": false,
+          "fs": "mount"
+        }
+      }
+    ]
+  }
+}

@@ -37,7 +37,7 @@ const OUTPUT_NAME = "Runtime Host";
 const LAST_RUNTIME_KEY = "runtimecode.runtime.last";
 
 const TIERS = ["quick", "faithful"];
-const SITES = ["worker", "webview", "window"];
+const SITES = ["worker", "webview", "window", "host"];
 const STDIN_MODES = ["none", "buffered", "blocking"];
 
 /**
@@ -61,7 +61,7 @@ const STDIN_MODES = ["none", "buffered", "blocking"];
  * @property {"quick"|"faithful"} tier
  * @property {string} [engine]
  * @property {string} [languageVersion]
- * @property {"worker"|"webview"|"window"} site
+ * @property {"worker"|"webview"|"window"|"host"} site
  * @property {string} worker
  * @property {string} [assets]
  * @property {number} [installBytes]
@@ -138,11 +138,14 @@ function runtimeProblems(extensionId, entry) {
   if (typeof record.tier !== "string" || !TIERS.includes(record.tier)) {
     problems.push(`${where}: tier has to be one of ${TIERS.join(", ")}.`);
   }
-  if (typeof record.site !== "string" || !SITES.includes(record.site)) {
+  const site = typeof record.site === "string" ? record.site : undefined;
+  if (site === undefined || !SITES.includes(site)) {
     problems.push(`${where}: site has to be one of ${SITES.join(", ")}.`);
   }
-  if (typeof record.worker !== "string" || !record.worker) {
-    problems.push(`${where}: needs a worker entry point.`);
+  if (site !== "host" && (typeof record.worker !== "string" || !record.worker)) {
+    problems.push(
+      `${where}: needs a worker entry point (only site "host" runs without one).`,
+    );
   }
   if (
     record.installBytes !== undefined &&

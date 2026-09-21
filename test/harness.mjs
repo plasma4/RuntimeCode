@@ -221,6 +221,18 @@ class Uri {
     return new Uri(match[1], match[2]);
   }
 
+  static file(value) {
+    return new Uri("file", value.startsWith("/") ? value : `/${value}`);
+  }
+
+  static joinPath(base, ...parts) {
+    const segments = [
+      base.path.replace(/\/+$/, ""),
+      ...parts.map((part) => String(part).replace(/^\/+/, "")),
+    ];
+    return new Uri(base.scheme, segments.join("/"));
+  }
+
   with(change) {
     return new Uri(change.scheme ?? this.scheme, change.path ?? this.path);
   }
@@ -500,6 +512,15 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
     workspace: {
       workspaceFolders: undefined,
       textDocuments: [],
+      /**
+       * Reads fail by default, the way a real workspace does when a file is
+       * missing. A test that wants a runnable entry replaces readFile.
+       */
+      fs: {
+        async readFile(uri) {
+          throw fsError("FileNotFound")(uri?.toString?.() ?? "file");
+        },
+      },
       registerFileSystemProvider(scheme, provider) {
         registered.fileSystemProvider = { scheme, provider };
         return { dispose() {} };
@@ -571,18 +592,21 @@ export function createVscodeStub({ hostCommands = {}, answers = {} } = {}) {
  * `crossOriginIsolated` is passed as a function parameter rather than assigned
  * onto globalThis, for the same reason as `navigator`: it has to be scoped to
  * the loaded extension. Node has no such global, so without this the host would
- * always report false.
+ * always report false. `fetch` is the same arrangement, and a test that wants
+ * to serve extension assets from disk replaces it.
  *
  * @param {object} [options]
  * @param {string} [options.extensionDir] folder name under extensions/
  * @param {string[]} [options.internals] names to expose as __internals
  * @param {boolean} [options.crossOriginIsolated]
+ * @param {typeof fetch} [options.fetch]
  */
 export function loadExtension(options = {}) {
   const {
     extensionDir = "runtimefs",
     internals = INTERNALS,
     crossOriginIsolated = false,
+    fetch: fetchImpl = globalThis.fetch,
     ...stubOptions
   } = options;
   const stub = createVscodeStub(stubOptions);
@@ -609,6 +633,7 @@ export function loadExtension(options = {}) {
     "setTimeout",
     "clearTimeout",
     "crossOriginIsolated",
+    "fetch",
     source + epilogue,
   );
 
@@ -628,6 +653,7 @@ export function loadExtension(options = {}) {
     setTimeout,
     clearTimeout,
     crossOriginIsolated,
+    fetchImpl,
   );
 
   return {

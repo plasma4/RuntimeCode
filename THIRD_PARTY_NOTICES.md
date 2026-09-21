@@ -33,11 +33,11 @@ Every folder under `extensions/` is a separate work with its own terms, and
 ships with its own license file beside its code. `scripts/check-licenses.mjs`
 fails the build if one does not.
 
-The current set (`runtimefs`, `python-rc`) is RuntimeCode's own and MIT, so
-today the distinction costs nothing. It exists for what comes next: per
-[RUNTIMES.md](RUNTIMES.md) and [NEXT.md](NEXT.md), several of the runtime packs
-worth shipping are GPL, and they need somewhere to live that does not relicense
-the host.
+The current set (`runtimefs`, `runtime-host`, `lua-wasmoon`, `python-rc`) is
+RuntimeCode's own and MIT, so today the distinction costs nothing. It exists for
+what comes next: per [RUNTIMES.md](RUNTIMES.md) and [NEXT.md](NEXT.md), several
+of the runtime packs worth shipping are GPL, and they need somewhere to live
+that does not relicense the host.
 
 That works because the web extension host loads an extension by reading one
 source file and calling `new Function('module','exports','require', src)`
@@ -115,9 +115,66 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## wasmoon (Lua runtime pack)
+
+`extensions/lua-wasmoon/` vendors wasmoon 1.16.0 (the UMD and the wasm module)
+and ships the upstream license beside them as
+`assets/LICENSE-wasmoon`. wasmoon is MIT:
+
+```text
+MIT License
+
+Copyright (c) 2023 Gabriel Francisco
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+The wasm module embeds Lua 5.4 itself, which is also MIT:
+
+```text
+Copyright © 1994–2026 Lua.org, PUC-Rio.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## Language packs
 
 Per [RUNTIMES.md](RUNTIMES.md), every runtime pack added later must record its
 license in `dist/packs/<id>/pack.json` and emit the upstream license into
 `dist/packs/<id>/LICENSE`. That is a separate artifact from `dist/app/` and is
-not covered by the file above.
+not covered by the file above. Until that pipeline exists (M2), the in-tree Lua
+pack records its upstream tarball and per-asset digests in
+`extensions/lua-wasmoon/pack.json` and ships the upstream license under its
+`assets/`; `test/luapack.test.mjs` checks both.

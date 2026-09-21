@@ -1,0 +1,43 @@
+{
+  "id": "lua.wasmoon",
+  "version": "1.16.0",
+  "displayName": "Lua (wasmoon)",
+  "languages": [
+    "lua"
+  ],
+  "tier": "quick",
+  "engine": "wasmoon",
+  "languageVersion": "5.4",
+  "site": "worker",
+  "license": "MIT",
+  "homepage": "https://github.com/ceifa/wasmoon",
+  "summary": "The official Lua VM compiled to wasm, real performance and cheap to embed.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "buffered",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "isolatedCapabilities": {
+    "stdin": "blocking"
+  },
+  "assets": [
+    {
+      "name": "glue.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/wasmoon@1.16.0/dist/glue.wasm",
+      "bytes": 271581,
+      "sha256": "95f3f19ddb740125883bc41d5ec670cd0828e7b58c8bdad385323cbff497b55c"
+    },
+    {
+      "name": "index.js",
+      "url": "https://cdn.jsdelivr.net/npm/wasmoon@1.16.0/dist/index.js",
+      "bytes": 151652,
+      "sha256": "dc2dcf019449008bb224370052473dc760db28b3ba14fc604e1ca3e8646af35d"
+    }
+  ]
+}

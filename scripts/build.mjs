@@ -98,6 +98,10 @@ gulp(minified ? "vscode-web-min-ci" : "vscode-web-ci");
 run("node", [path.join(RC_ROOT, "scripts", "staticify.mjs")]);
 // After staticify, which rimrafs dist/ before it moves gulp's output in.
 run("node", [path.join(RC_ROOT, "scripts", "homepage.mjs")]);
+// Runtime packs are a third artifact beside app/ and host-root/. They are built
+// from pinned, verified sources; unpinned packs are reported and skipped, never
+// a build failure. See scripts/packs.mjs.
+run("node", [path.join(RC_ROOT, "scripts", "packs.mjs"), "--build"]);
 run("node", [path.join(RC_ROOT, "scripts", "check-endpoints.mjs")]);
 run("node", [path.join(RC_ROOT, "scripts", "check-licenses.mjs")]);
 

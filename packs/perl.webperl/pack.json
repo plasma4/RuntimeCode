@@ -1,0 +1,32 @@
+{
+  "id": "perl.webperl",
+  "version": "0.09-beta",
+  "displayName": "Perl (WebPerl)",
+  "languages": [
+    "perl"
+  ],
+  "tier": "quick",
+  "engine": "webperl",
+  "languageVersion": "5.32",
+  "site": "worker",
+  "license": "Artistic-2.0",
+  "homepage": "https://webperl.zero-g.net/",
+  "summary": "The perl binary itself ported to wasm, not a JS translation.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "buffered",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "assets": [
+    {
+      "name": "webperl.zip",
+      "url": "https://github.com/haukex/webperl/releases/download/v0.09-beta/webperl_prebuilt_v0.09-beta.zip"
+    }
+  ]
+}

@@ -464,7 +464,7 @@ class RuntimePty {
    * The closed flag keeps it to one close, and the close flag keeps onClose
    * from disposing a session that has already exited.
    *
-   * @param {number | undefined} code
+   * @param {number | undefined} [code]
    */
   close(code) {
     if (this.closed) {

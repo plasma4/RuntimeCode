@@ -1,0 +1,32 @@
+{
+  "id": "php.php-wasm",
+  "version": "0.1.0",
+  "displayName": "PHP (php-wasm)",
+  "languages": [
+    "php"
+  ],
+  "tier": "quick",
+  "engine": "php-wasm",
+  "languageVersion": "8.5",
+  "site": "worker",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/seanmorris/php-wasm",
+  "summary": "Self-contained PHP 8.5, Apache-2.0, no bundled extras.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "buffered",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "assets": [
+    {
+      "name": "php8.5-web.js",
+      "url": "https://cdn.jsdelivr.net/npm/php-wasm@0.1.0/php8.5-web.js"
+    }
+  ]
+}

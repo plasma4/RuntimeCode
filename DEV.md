@@ -8,14 +8,17 @@ built.
 ```sh
 nvm use 24.18.0                        # the version in ../vscode/.nvmrc
 node scripts/prepare.mjs               # overlay/, product.overlay.json, patches/
-node scripts/build.mjs                 # gulp + staticify + homepage + the two gates  (--min to minify, --full to recompile)
+node scripts/build.mjs                 # gulp + staticify + homepage + packs + the two gates  (--min to minify, --full to recompile)
+node scripts/packs.mjs --list          # what packs are defined and which are pinned
+node scripts/packs.mjs --pin <id>      # download a pack's assets and record their sha256 in packs/<id>/pack.json
+node scripts/packs.mjs --build         # verify + emit dist/packs/ and catalog.json (also runs as part of build.mjs)
 node scripts/homepage.mjs              # just the landing page; needs no vscode checkout
 node scripts/check-licenses.mjs        # every extension states its terms, and AGPL stays out of app/
 node scripts/serve.mjs                 # http://127.0.0.1:8099  (also /app/ and /homepage/)
-node scripts/serve.mjs --simulate-rfs  # the same build under /n/RuntimeCode/, fixtures at /n/<name>/
+node scripts/serve.mjs --simulate-rfs  # the same build under /n/RuntimeCode/, fixtures at /n/<name>/, packs at /n/RC-Packs/
 node scripts/serve.mjs --coi           # ...plus COOP+COEP, for measuring cross-origin isolation
-node --test test/                      # the RuntimeFS extension and the build helpers
-node scripts/typecheck.mjs             # tsc over extensions/; run once so the editor stops complaining
+node --test test/                      # the RuntimeFS extension, python-rc, the pack pipeline, and the build helpers
+node scripts/typecheck.mjs             # does a full tsc over extensions/; run once so the editor stops complaining
 node scripts/upgrade.mjs 1.138.0       # pin a new upstream tag and rebuild
 node scripts/check-deploy.mjs https://example.org/projects/RuntimeFS/n/RC/
 ```

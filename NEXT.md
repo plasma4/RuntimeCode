@@ -1,13 +1,14 @@
-# Next: learn the runtime packs before building them
+# Next: build the runtime packs
 
 Learning path and download sources for the runtime-host milestone. RUNTIMES.md
 defines what a pack is and how the host consumes it; this file points at where
 to learn the VS Code API those plans lean on, where each runtime actually comes
 from, and which runtimes are worth shipping at all.
 
-The immediate goal is still RUNTIMES.md M1: the runtime host plus one tiny pack
-(Lua or QuickJS), built in-tree. Everything here is ordered so that M1 has what
-it needs first.
+The immediate goal is RUNTIMES.md M2's install half: the runtime host plus the
+pack pipeline. The pipeline (`scripts/packs.mjs`) now exists and eight packs are
+pinned under `packs/<id>/pack.json`; what remains is M3, the engines' `createSession`
+that turns an installed pack's bytes into program output.
 
 ## Terminology first
 
@@ -546,7 +547,10 @@ covers), not just the language.
 - Pin real versions: this file's URLs are current as of writing, but RUNTIMES.md
   pins were written earlier (it names Pyodide 0.28.x while newer releases
   exist). The pack build resolves this: `packs/<id>/pack.json` pins each URL and
-  digest, and a mismatch fails the build.
+  digest, and a mismatch fails the build. **Progress:** eight packs are pinned
+  (`python.pyodide`, `javascript.quickjs`, `typescript.esbuild`,
+  `lua.wasmoon`, `sql.sqlite`, `ruby.ruby-wasm`, `r.webr`, `c.browsercc`);
+  `perl.webperl` and `php.php-wasm` are declared but wait for archive support.
 - Decide the WASI shim before writing pack code, because it changes the guest
   entry point. The `packload` and `nestedworker` spikes in RUNTIMES.md come
   first and can invalidate the architecture.

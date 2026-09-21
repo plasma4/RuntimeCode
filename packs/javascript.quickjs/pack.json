@@ -1,0 +1,37 @@
+{
+  "id": "javascript.quickjs",
+  "version": "3.6.2",
+  "displayName": "JavaScript (QuickJS-ng)",
+  "languages": [
+    "javascript"
+  ],
+  "tier": "faithful",
+  "engine": "quickjs-wasi",
+  "languageVersion": "ES2020",
+  "site": "worker",
+  "license": "MIT",
+  "homepage": "https://github.com/vercel-labs/quickjs-wasi",
+  "summary": "QuickJS-ng compiled to WASI: isolated, deterministic JavaScript in under a megabyte.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "buffered",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "isolatedCapabilities": {
+    "stdin": "blocking"
+  },
+  "assets": [
+    {
+      "name": "quickjs.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/quickjs-wasi@3.6.2/quickjs.wasm",
+      "bytes": 637405,
+      "sha256": "d4c9375f2b1ca4dc95f72c8aa2982a7a9951ac8011490d79c6582df732b4bbd9"
+    }
+  ]
+}

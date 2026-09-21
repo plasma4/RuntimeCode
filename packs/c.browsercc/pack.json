@@ -1,0 +1,65 @@
+{
+  "id": "c.browsercc",
+  "version": "0.1.1",
+  "displayName": "C/C++ (browsercc)",
+  "languages": [
+    "c",
+    "cpp"
+  ],
+  "tier": "faithful",
+  "engine": "browsercc",
+  "languageVersion": "clang",
+  "site": "worker",
+  "license": "MIT",
+  "homepage": "https://github.com/BertalanD/browsercc",
+  "summary": "A real clang/lld compiled to wasm, for compiling single-file C and C++ in the browser.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "none",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "assets": [
+    {
+      "name": "clang.js",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/clang.js",
+      "bytes": 74193,
+      "sha256": "27aeadfcdb71f37fdeb6f1ca339de913ef9e2fdd1fd53c238a5decf635d9b129"
+    },
+    {
+      "name": "clang.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/clang.wasm",
+      "bytes": 42553880,
+      "sha256": "d574339640a9764544f405d4b5ae79ef7d05e49725b416fba74f5b15c00f8ee5"
+    },
+    {
+      "name": "lld.js",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/lld.js",
+      "bytes": 71604,
+      "sha256": "b5054c24942687c744adbadcd549073ce3ecaf69b9fed5fa85a20c046751c1bf"
+    },
+    {
+      "name": "lld.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/lld.wasm",
+      "bytes": 23202572,
+      "sha256": "810bb3be4eec8ad6bae60ceb7355c07bf7de8a54b5c8acb4d7a80613bd43c4bf"
+    },
+    {
+      "name": "sysroot.tar",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/sysroot.tar",
+      "bytes": 28620800,
+      "sha256": "dbed83f93f0fa695f36041b82a95a8cd78f106a3f49d9cd860e57ae1ac823318"
+    },
+    {
+      "name": "stdc++.h.pch",
+      "url": "https://cdn.jsdelivr.net/npm/browsercc@0.1.1/dist/stdc++.h.pch",
+      "bytes": 19359928,
+      "sha256": "de0c98ccec24c008d44ab6c10a2d9529a01d049e8d96081ee944115f57956634"
+    }
+  ]
+}

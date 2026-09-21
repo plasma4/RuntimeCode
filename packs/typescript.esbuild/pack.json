@@ -1,0 +1,41 @@
+{
+  "id": "typescript.esbuild",
+  "version": "0.28.2",
+  "displayName": "TypeScript (esbuild-wasm)",
+  "languages": [
+    "typescript",
+    "javascript"
+  ],
+  "tier": "quick",
+  "engine": "esbuild-wasm",
+  "languageVersion": "transforms TS to JS",
+  "site": "worker",
+  "license": "MIT",
+  "homepage": "https://esbuild.github.io/api/#browser",
+  "summary": "Real esbuild in the browser: TypeScript and JSX down to JS, then run through the host's JS tier.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "none",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "assets": [
+    {
+      "name": "esbuild.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/esbuild-wasm@0.28.2/esbuild.wasm",
+      "bytes": 13978850,
+      "sha256": "b1831a5c0f6cf688034fb94d0419812f165ea316a3380d3fc00a151e562d2eaf"
+    },
+    {
+      "name": "browser.js",
+      "url": "https://cdn.jsdelivr.net/npm/esbuild-wasm@0.28.2/lib/browser.js",
+      "bytes": 133484,
+      "sha256": "91593b8f5d1021600a92443717a52e311bb1e1b772981f6aab76cd0ffba33169"
+    }
+  ]
+}

@@ -308,36 +308,47 @@ dependency we vendor at build time needs no gallery entry at all.
 
 ## Distribution and install
 
+**Built.** `scripts/packs.mjs` (pure core in `scripts/packs-lib.mjs`) reads
+`packs/<id>/pack.json`, verifies the pinned SHA-256 of every asset, and writes
+`dist/packs/<id>/` plus `dist/packs/catalog.json`. `build.mjs` runs it, so a
+normal build ships whatever is pinned. `--pin` records digests; `--build` and
+`--list` report and skip unpinned packs instead of failing, because an archive
+pack is a documented spike, not a regression.
+
 At build time, in `scripts/packs.mjs`, following the Eruda precedent:
 
 1. Read `packs/<id>/pack.json`: pinned upstream URLs, a SHA-256 per asset, the
    license, the version.
 2. Fetch, verify every digest, and fail the build on a mismatch.
-3. Bundle the pack's extension entry and worker entry to CommonJS or IIFE.
-4. Write `dist/packs/<id>/` and a `dist/packs/catalog.json` recording id,
-   version, bytes, digests and license.
+3. Write `dist/packs/<id>/` with the assets, a generated extension manifest
+   (`package.json` + `extension.js` + `session.js`), the `pack.json` the host
+   probes, and the upstream `LICENSE`.
+4. Write `dist/packs/catalog.json` recording id, version, bytes, digests,
+   license, and every file the pack folder ships.
 
 Deploying it makes `dist/packs/` a RuntimeFS folder, for example `/n/RC-Packs/`.
 That is a third artifact next to `app/` and `host-root/`, so `check-deploy.mjs`
-and the README deploy table both need to learn about it.
+and the README deploy table both know about it.
 
-At install time, in the host extension:
+At install time, in the host extension (python-rc, `Python: Install Runtime
+Pack...`):
 
-1. Read `catalog.json` from the packs folder, or from the local build while
-   developing.
-2. Copy the pack into OPFS under `rfs_write_<name>`, verifying digests again.
+1. Read `catalog.json` from the packs folder.
+2. Copy the pack into OPFS under `rfs_write_<name>`, verifying digests again
+   against the catalog.
 3. Record it in `rfs/.runtimecode/packs.json`.
 4. Invalidate the RuntimeFS cache and offer a reload.
 
 At startup, in `static/index.html`, before `create()`: read `packs.json` from
-OPFS, resolve each entry to `<rfsBase>/n/<PacksFolder>/<id>/`, and append them to
-`additionalBuiltinExtensions`. Served standalone there is no `/n/` segment and so
-no packs, the same degradation the preview commands already handle. The host
+OPFS, resolve each entry to `<rfsBase>/n/<PacksFolder>/<id>/`, and append them
+to `additionalBuiltinExtensions`. Served standalone there is no `/n/` segment and
+so no packs, the same degradation the preview commands already handle. The host
 should say so rather than showing an empty runtime list.
 
-Uninstall is our own command: delete the folder, drop the entry, reload. A
-cleanup command that removes pack folders with no `packs.json` entry will pay for
-itself the first time an install is interrupted.
+Uninstall is our own command (`Python: Uninstall Runtime Pack...`): delete the
+folder, drop the entry, reload. `Python: Clean Up Orphaned Pack Folders` removes
+pack folders with no `packs.json` entry, which pays for itself the first time an
+install is interrupted.
 
 Open VSX stays a secondary path. A pack published there installs and hot-loads
 with no reload, but fetches its assets from a third-party CDN at run time, which
@@ -355,7 +366,9 @@ gives up offline use. Support it, do not depend on it.
 - Decide explicitly whether `dist/packs/` is in scope for `check-endpoints.mjs`.
   Runtime bundles carry enormous amounts of incidental text and will generate
   noise, so skipping them like `node_modules` and relying on digests is probably
-  right.
+  right. **Decided:** `dist/packs/` is skipped by the endpoint gate; the pinned
+  SHA-256 at build time is the verification, and a runtime asset is not ours to
+  police for doc-comment endpoints.
 - The sandbox boundary is the wasm module plus the mount table. Guest code
   reaches only what the table names. Worth saying in the pack docs that webviews
   and the workbench share an origin in this build (patch 0003), so a pack, as
@@ -416,19 +429,30 @@ A new pack is not done until it has a conformance row.
 | M4  | A second tier for one language, plus the conformance and benchmark harness                  | Two Python runtimes, one table comparing them, a picker that explains the difference                              |
 | M5  | An inline DAP debug adapter for one runtime                                                 | Breakpoints and stepping in the web debug UI                                                                      |
 
+M2 is mostly landed: `scripts/packs.mjs` and `scripts/packs-lib.mjs` exist, ten
+packs are defined with eight pinned (`python.pyodide`, `javascript.quickjs`,
+`typescript.esbuild`, `lua.wasmoon`, `sql.sqlite`, `ruby.ruby-wasm`, `r.webr`,
+`c.browsercc`), install/uninstall/cleanup run from python-rc, and the bootstrap
+registers installed packs. What remains is the run half (M3): the engines'
+`createSession` is still `notImplemented`, so an installed pack reports its
+session as pending rather than producing output.
+
 M0 and M1 are small. M2 is where the real work is, because it touches the
 bootstrap, the deploy story and `check-deploy.mjs`.
 
 ## Open questions
 
 1. Isolation policy: opt-in, default, or `credentialless`. Blocks the stdin tiers
-   and every threaded runtime.
+   and every threaded runtime. **Still open;** the host works without it and says
+   what it degrades to.
 2. The packs folder name, and whether packs share one RuntimeFS folder or get one
-   each. One folder is simpler to deploy. One each makes cache invalidation and
-   Custom Headers independent per pack.
+   each. **Decided:** one folder, `RC-Packs` by default (the
+   `runtimecode.python.packsFolder` setting), matching what the host and the
+   bootstrap both resolve.
 3. Whether `check-deploy.mjs` and the README deploy table grow a third artifact
-   now or after M2.
-4. Dirty buffers: save before run, or overlay.
+   now or after M2. **Decided now:** both check and document `dist/packs/`.
+4. Dirty buffers: save before run, or overlay. The host implements `save`
+   (the VS Code-typical answer) and leaves the setting open.
 5. Whether the host should also contribute a notebook controller, which would
    undermine the terminal-first assumption in the contract.
 6. Naming. This file says "runtime pack" throughout, and `runtimecode.runtimes`

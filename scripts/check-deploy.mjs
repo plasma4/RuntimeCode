@@ -7,6 +7,7 @@
  * and neither produces a useful console message, so check them directly.
  */
 import { APP_OUT, HOST_OUT } from "./lib.mjs";
+import { PACKS_OUT } from "./packs.mjs";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -94,6 +95,34 @@ if (!root) {
 if (!existsSync(path.join(APP_OUT, "index.html"))) {
   console.log(
     "[check-deploy] note: no local build in dist/, so nothing was compared against it",
+  );
+}
+
+// The packs folder is a third artifact, optional: no packs means no runtimes,
+// which is a supported state (the host says so), not a broken deployment. But
+// when packs exist they have to be reachable, because a catalog that 404s is a
+// silent "no runtimes" where the user asked for one.
+const packsIndex = path.join(PACKS_OUT, "catalog.json");
+if (existsSync(packsIndex)) {
+  if (root) {
+    const catalogUrl = new URL(`n/RC-Packs/catalog.json`, root);
+    const catalog = await head(catalogUrl);
+    if (catalog.ok) {
+      console.log(`[check-deploy] OK   packs        ${catalogUrl}`);
+    } else {
+      problems.push(
+        `${catalogUrl} is not reachable (HTTP ${catalog.status}). ` +
+          `Upload ${PACKS_OUT} as a RuntimeFS folder named RC-Packs, or every runtime reads as not installed.`,
+      );
+    }
+  } else {
+    console.log(
+      "[check-deploy] NOTE packs       local build has packs, but this is a standalone deployment with no /n/ path to serve them",
+    );
+  }
+} else {
+  console.log(
+    "[check-deploy] note: no packs built in dist/, so no pack catalog to check",
   );
 }
 

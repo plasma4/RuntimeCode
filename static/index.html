@@ -12,15 +12,7 @@
 		content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
 	<!--
-		RuntimeCode's own bootstrap.
-
-		The upstream out/vs/code/browser/workbench/workbench.html is NOT usable
-		for this target: build/next/index.ts:181-186 builds the `web` target with
-		"web workbench only (no browser shell)", so vs/code/browser/workbench/
-		workbench.js is never emitted. Only server-web gets it. The vscode-web
-		bundle is meant to be driven by an embedder calling create() directly,
-		which is what this file does. That is also what we want, since the RFS
-		workspace and filesystem providers plug in here.
+		RuntimeCode's custom bootstrap logic.
 	-->
 	<meta id="vscode-workbench-web-configuration" data-settings="{{WORKBENCH_WEB_CONFIGURATION}}">
 
@@ -199,6 +191,44 @@
 		};
 
 		/**
+		 * Installed runtime packs, resolved to extension URLs for
+		 * additionalBuiltinExtensions.
+		 *
+		 * The python-rc host writes `rfs/.runtimecode/packs.json` at install
+		 * time. Each entry is a RuntimeFS folder, so it is only servable as an
+		 * extension URL (`/n/<Folder>/<id>/`) when RuntimeFS's service worker
+		 * controls this page. The same getRuntimeFsBase derivation that decides
+		 * whether packs can exist at all is used here, so standalone and
+		 * RuntimeFS-served deployments cannot disagree.
+		 *
+		 * Served standalone there is no `/n/` segment and so no packs, which is
+		 * the same degradation the preview commands already handle: the host
+		 * says so rather than showing an empty runtime list.
+		 */
+		const readInstalledPacks = async () => {
+			if (!navigator.storage?.getDirectory) { return []; }
+			try {
+				const root = await navigator.storage.getDirectory();
+				const rfs = await root.getDirectoryHandle('rfs');
+				const dir = await rfs.getDirectoryHandle('.runtimecode');
+				const file = await dir.getFileHandle('packs.json');
+				const text = await (await file.getFile()).text();
+				const registry = text ? JSON.parse(text) : {};
+				if (!registry.packs || typeof registry.packs !== 'object') { return []; }
+				const base = await getRuntimeFsBase();
+				if (!base) { return []; }
+				const folder = typeof registry.folder === 'string' ? registry.folder : 'RC-Packs';
+				return Object.keys(registry.packs)
+					.filter((id) => registry.packs[id])
+					.map((id) => `${base}/n/${encodeURIComponent(folder)}/${encodeURIComponent(id)}/`);
+			} catch {
+				// No packs installed yet, or OPFS unavailable: an empty list is
+				// the honest answer, not an error page.
+				return [];
+			}
+		};
+
+		/**
 		 * Pick a native directory and copy it into OPFS under rfs/<name>, then hand
 		 * the name back. Only the copying happens here, because only the window has
 		 * the picker. Registering the folder in rfs_system.json is the extension's
@@ -272,11 +302,21 @@
 			'./out/vs/workbench/contrib/webview/browser/pre', window.location.href
 		).toString();
 
+		// Installed runtime packs join the built-in extensions: a pack is only
+		// servable as an extension URL when RuntimeFS controls the page, so the
+		// same base derivation that gates pack existence is reused here.
+		const installedPacks = await readInstalledPacks();
+
 		await create(document.body, {
 			...config,
 			webviewEndpoint,
 			workspaceProvider,
-			additionalBuiltinExtensions: [runtimefsExtension, pythonRfsExtension, runtimeHostExtension],
+			additionalBuiltinExtensions: [
+				runtimefsExtension,
+				pythonRfsExtension,
+				runtimeHostExtension,
+				...installedPacks.map((url) => URI.parse(url))
+			],
 			// Handlers are functions, so these cannot live in the JSON config.
 			commands: [
 				{ id: 'runtimecode.internal.invalidateRfsCache', handler: invalidateRfsCache },

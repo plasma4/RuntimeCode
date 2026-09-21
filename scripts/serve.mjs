@@ -37,6 +37,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { RC_ROOT, RFS_ROOT, APP_OUT, HOST_OUT, DIST } from "./lib.mjs";
+import { PACKS_OUT } from "./packs.mjs";
 
 const PORT = Number(process.env.PORT ?? 8099);
 const withRfs = process.argv.includes("--with-rfs");
@@ -48,6 +49,8 @@ const simulatedFolder =
     ? process.argv[rfsFolderArg + 1]
     : (process.env.RUNTIMEFS_FOLDER ?? "RuntimeCode");
 const simulatedFolderPrefix = `/n/${encodeURIComponent(simulatedFolder)}`;
+/** The packs folder name RuntimeFS folders for packs are deployed as. */
+const PACKS_FOLDER = "RC-Packs";
 /** Fixture folders served at /n/<name>/ in --simulate-rfs mode. */
 const FIXTURES = path.join(RC_ROOT, "fixtures");
 
@@ -107,6 +110,8 @@ createServer((req, res) => {
     return;
   } else if (simulateRfs && req.url.startsWith(`${simulatedFolderPrefix}/`)) {
     file = resolveFile(APP_OUT, req.url.slice(simulatedFolderPrefix.length));
+  } else if (simulateRfs && req.url.startsWith(`/n/${PACKS_FOLDER}/`)) {
+    file = resolveFile(PACKS_OUT, req.url.slice(`/n/${PACKS_FOLDER}`.length));
   } else if (simulateRfs && req.url.startsWith("/n/")) {
     file = resolveFile(FIXTURES, req.url.slice("/n".length));
   } else if (withRfs && req.url.startsWith("/rc/")) {
@@ -159,6 +164,7 @@ createServer((req, res) => {
   if (simulateRfs) {
     console.log(`[serve] app:       ${APP_OUT} -> ${simulatedFolderPrefix}/`);
     console.log(`[serve] fixtures:  ${FIXTURES} -> /n/<name>/`);
+    console.log(`[serve] packs:     ${PACKS_OUT} -> /n/${PACKS_FOLDER}/`);
   } else if (withRfs) {
     console.log(`[serve] runtimefs: ${RFS_ROOT} -> /`);
     console.log(`[serve] app:       ${APP_OUT} -> /rc/`);

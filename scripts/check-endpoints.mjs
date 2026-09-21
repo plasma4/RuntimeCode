@@ -26,7 +26,7 @@ const PATTERNS = [
 
 const TEXT_EXT = new Set([".js", ".mjs", ".cjs", ".json", ".html", ".css"]);
 /** Vendored dependencies are not ours to police and are full of doc-comment noise. */
-const SKIP_DIRS = new Set(["node_modules", "sourcemaps"]);
+const SKIP_DIRS = new Set(["node_modules", "sourcemaps", "packs"]);
 
 const allowlist = JSON.parse(
   readFileSync(path.join(RC_ROOT, "endpoint-allowlist.json"), "utf8"),

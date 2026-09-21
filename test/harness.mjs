@@ -108,7 +108,7 @@ class FakeFileHandle {
   }
 }
 
-class FakeDirectoryHandle {
+export class FakeDirectoryHandle {
   kind = "directory";
 
   constructor(name = "") {

@@ -1,0 +1,43 @@
+{
+  "id": "ruby.ruby-wasm",
+  "version": "3.3-wasi-2.10.1",
+  "displayName": "Ruby (ruby.wasm)",
+  "languages": [
+    "ruby"
+  ],
+  "tier": "quick",
+  "engine": "ruby-wasi",
+  "languageVersion": "3.3",
+  "site": "worker",
+  "license": "MIT",
+  "homepage": "https://github.com/ruby/ruby.wasm",
+  "summary": "CRuby compiled for WASI, with JS interop.",
+  "requires": {
+    "crossOriginIsolated": false
+  },
+  "capabilities": {
+    "stdin": "buffered",
+    "threads": false,
+    "packages": "none",
+    "graphics": "none",
+    "debug": false,
+    "fs": "mount"
+  },
+  "isolatedCapabilities": {
+    "stdin": "blocking"
+  },
+  "assets": [
+    {
+      "name": "ruby.wasm",
+      "url": "https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.10.1/dist/ruby.wasm",
+      "bytes": 16296167,
+      "sha256": "6ed4db69b832690b1b84605a53e607044243c555b85a913f647fd362675b70b0"
+    },
+    {
+      "name": "browser.script.iife.js",
+      "url": "https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.10.1/dist/browser.script.iife.js",
+      "bytes": 160918,
+      "sha256": "6c25f957922e2a9ce0848229c4635f4de74a3a529a92ddeeda4ffb5260940eef"
+    }
+  ]
+}

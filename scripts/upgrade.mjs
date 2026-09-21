@@ -1,6 +1,5 @@
 /**
  * Move RuntimeCode to a newer upstream release:
- *
  *   node scripts/upgrade.mjs 1.132.0
  *   node scripts/upgrade.mjs 1.132.0 --min      # release build
  *

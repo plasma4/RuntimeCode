@@ -65,9 +65,28 @@ const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.js";
 const ERUDA_SHA256 =
   "332f95b14b1dc53cdbe6042e0ea95ac6025ac691c285d51b647c64360fe939e2";
 
-/** Matches asJSON in webClientServer.ts:361. The config lands in an HTML attribute. */
-function asJSON(value) {
-  return JSON.stringify(value).replace(/"/g, "&quot;");
+/**
+ * The config lands in a quoted HTML attribute, so it has to be attribute-encoded
+ * on the way in. Upstream splits that across two places: asJSON
+ * (webClientServer.ts:361) is a bare JSON.stringify, and renderWorkbenchTemplate
+ * (webClientServer.ts:122) runs every substituted value through
+ * htmlAttributeEncodeValue (base/common/strings.ts:58). We do both here, and
+ * encode the same five characters upstream does. Encoding only `"` is not
+ * enough: an `&` or a `<` anywhere in product.json then reaches the attribute
+ * raw, and the HTML parser mangles the JSON before the workbench ever sees it.
+ */
+function asAttribute(value) {
+  return JSON.stringify(value).replace(
+    /[<>"'&]/g,
+    (ch) =>
+      ({
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&apos;",
+        "&": "&amp;",
+      })[ch],
+  );
 }
 
 function buildProductConfiguration() {
@@ -375,7 +394,7 @@ async function main() {
   let html = readFileSync(templatePath, "utf8");
 
   const values = {
-    WORKBENCH_WEB_CONFIGURATION: asJSON(buildWorkbenchConfiguration()),
+    WORKBENCH_WEB_CONFIGURATION: asAttribute(buildWorkbenchConfiguration()),
   };
 
   for (const [key, value] of Object.entries(values)) {

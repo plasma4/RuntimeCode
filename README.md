@@ -2,16 +2,19 @@
 
 A static, de-Microsoft'd build of VS Code for the browser. Easily ship a plain folder of files, with optional extension components with their own licenses to support other languages (TODO: Python, JS, C...)
 
-RuntimeCode is not affiliated with or endorced by Microsoft.
+RuntimeCode is not affiliated with or endorsed by Microsoft.
 
 ## Building
 
-You **must** have the [Microsoft VSCode repo](https://github.com/microsoft/vscode) cloned at `../vscode` in order to build. Note that 24GB RAM is recommended for a cold build (or an overnight build session, with potential custom configuration necessary) and 16GB for warm ones.
+You **must** have the [Microsoft VSCode repo](https://github.com/microsoft/vscode)
+cloned at `../vscode` in order to build. Note that 24GB RAM is recommended for a
+cold build (or an overnight build session, with potential custom configuration
+necessary) and 16GB for warm ones.
 
 ```sh
-nvm use 24.18.0
+nvm use 24.18.0              # make sure that you have nvm installed locally!
 node scripts/prepare.mjs     # checkout pin, apply overlay + product + patches
-node scripts/build.mjs       # gulp + staticify + endpoint gate
+node scripts/build.mjs       # gulp + staticify + homepage + the endpoint and license gates
 node scripts/serve.mjs       # http://127.0.0.1:8099
 ```
 

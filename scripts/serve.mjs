@@ -8,6 +8,9 @@
  *   node scripts/serve.mjs --simulate-rfs  # dist/app at /n/RuntimeCode/, fixtures at /n/<name>/
  *   node scripts/serve.mjs --coi           # ...and COOP+COEP on every response
  *
+ * --rfs-folder <name> (or RUNTIMEFS_FOLDER) renames the simulated folder, for
+ * checking that nothing has hardcoded "RuntimeCode" as the folder name.
+ *
  * dist/host-root is always served at /, in every mode, because that is where it
  * lives in production. Getting that wrong locally is how a missing host-root
  * deployment stays invisible until webviews break on the real site.
